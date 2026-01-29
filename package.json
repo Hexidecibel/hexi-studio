@@ -38,8 +38,8 @@
     "prepublishOnly": "npm run build:lib"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": "^17.0.0 || ^18.0.0",
+    "react-dom": "^17.0.0 || ^18.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
@@ -75,11 +75,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hexi/gallery.git"
+    "url": "https://github.com/Hexidecibel/hexi-photo-gallery.git"
   },
-  "homepage": "https://github.com/hexi/gallery#readme",
+  "homepage": "https://ccushman.com/#/gallery",
   "bugs": {
-    "url": "https://github.com/hexi/gallery/issues"
+    "url": "https://github.com/Hexidecibel/hexi-photo-gallery/issues"
   },
   "author": "",
   "publishConfig": {

@@ -1,5 +1,7 @@
 # @hexi/gallery
 
+> **[Live Demo](https://ccushman.com/#/gallery)**
+
 A beautiful, configurable photo gallery component for React with grid, masonry, and justified layouts.
 
 - **Three layout algorithms** — CSS Grid, Masonry (shortest-column), and Justified (Google Photos-style row packing)
