@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { ImageItem } from '../../types';
+import { useIntersectionObserver } from '../../hooks/useIntersectionObserver';
 import styles from './GalleryImage.module.css';
 
 export interface GalleryImageProps {
@@ -19,6 +20,7 @@ export function GalleryImage({
 }: GalleryImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const { ref, isIntersecting } = useIntersectionObserver({ rootMargin: '200px' });
 
   const handleLoad = useCallback(() => {
     setIsLoaded(true);
@@ -32,6 +34,7 @@ export function GalleryImage({
     onClick?.(image, index);
   }, [onClick, image, index]);
 
+  const shouldRenderImg = isIntersecting || loading === 'eager';
   const src = image.thumbnail || image.src;
   const hasAspectRatio = image.width && image.height;
 
@@ -42,17 +45,17 @@ export function GalleryImage({
 
   const content = (
     <>
-      {!hasError ? (
+      {shouldRenderImg && !hasError ? (
         <img
           src={src}
           alt={image.alt}
-          loading={loading}
           onLoad={handleLoad}
           onError={handleError}
           className={`${styles.image} ${isLoaded ? styles.loaded : ''}`}
           draggable={false}
+          {...(image.srcSet ? { srcSet: image.srcSet, sizes: '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw' } : undefined)}
         />
-      ) : (
+      ) : hasError ? (
         <div className={styles.error} aria-label="Image failed to load">
           <svg
             viewBox="0 0 24 24"
@@ -66,7 +69,7 @@ export function GalleryImage({
             <path d="M21 15l-5-5L5 21" />
           </svg>
         </div>
-      )}
+      ) : null}
       {!isLoaded && !hasError && (
         <div className={styles.shimmer} aria-hidden="true" />
       )}
@@ -82,6 +85,7 @@ export function GalleryImage({
   if (onClick) {
     return (
       <button
+        ref={ref as unknown as React.RefObject<HTMLButtonElement>}
         type="button"
         className={wrapperClassName}
         style={wrapperStyle}
@@ -94,7 +98,7 @@ export function GalleryImage({
   }
 
   return (
-    <div className={wrapperClassName} style={wrapperStyle}>
+    <div ref={ref as unknown as React.RefObject<HTMLDivElement>} className={wrapperClassName} style={wrapperStyle}>
       {content}
     </div>
   );

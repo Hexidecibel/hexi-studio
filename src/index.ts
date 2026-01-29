@@ -23,12 +23,9 @@ import './styles/theme.css';
 // Components
 export { Gallery } from './components/Gallery';
 export { GalleryImage } from './components/Gallery';
-// export { GalleryConfigurator } from './components/GalleryConfigurator';
+export { Lightbox } from './components/Gallery';
+export type { LightboxProps } from './components/Gallery';
 
-// Hooks (to be implemented)
-// export { useGallery } from './hooks/useGallery';
-// export { useLightbox } from './hooks/useLightbox';
-
-// Source Adapters (to be implemented)
-// export { createUrlAdapter } from './services/urlAdapter';
-// export { createS3Adapter } from './services/s3Adapter';
+// Hooks
+export { useLightbox } from './hooks/useLightbox';
+export { useIntersectionObserver } from './hooks/useIntersectionObserver';

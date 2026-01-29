@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { Gallery } from '../Gallery';
 import type { ImageItem } from '../../../types';
 
 const mockImages: ImageItem[] = [
-  { id: '1', src: 'https://example.com/1.jpg', alt: 'Image 1' },
+  { id: '1', src: 'https://example.com/1.jpg', alt: 'Image 1', title: 'First' },
   { id: '2', src: 'https://example.com/2.jpg', alt: 'Image 2' },
   { id: '3', src: 'https://example.com/3.jpg', alt: 'Image 3' },
 ];
@@ -75,5 +75,36 @@ describe('Gallery', () => {
 
     const grid = container.querySelector('.gallery-grid');
     expect(grid).toHaveStyle({ gap: '2rem' });
+  });
+
+  it('opens lightbox on image click when enableLightbox is true', () => {
+    render(<Gallery images={mockImages} enableLightbox />);
+
+    const buttons = screen.getAllByRole('button');
+    fireEvent.click(buttons[0]);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('does not open lightbox when enableLightbox is false', () => {
+    const handleClick = vi.fn();
+    render(<Gallery images={mockImages} onImageClick={handleClick} />);
+
+    const buttons = screen.getAllByRole('button');
+    fireEvent.click(buttons[0]);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(handleClick).toHaveBeenCalled();
+  });
+
+  it('fires both onImageClick and lightbox when enableLightbox is true', () => {
+    const handleClick = vi.fn();
+    render(<Gallery images={mockImages} onImageClick={handleClick} enableLightbox />);
+
+    const buttons = screen.getAllByRole('button');
+    fireEvent.click(buttons[0]);
+
+    expect(handleClick).toHaveBeenCalledWith(mockImages[0], 0);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
