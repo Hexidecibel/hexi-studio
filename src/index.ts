@@ -29,3 +29,4 @@ export type { LightboxProps } from './components/Gallery';
 // Hooks
 export { useLightbox } from './hooks/useLightbox';
 export { useIntersectionObserver } from './hooks/useIntersectionObserver';
+export { useContainerWidth } from './hooks/useContainerWidth';

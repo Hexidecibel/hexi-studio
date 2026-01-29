@@ -19,16 +19,3 @@
 .row:last-child :global(.gallery-image) {
   flex: 0 1 auto;
 }
-
-/* Responsive row height */
-@media (max-width: 639px) {
-  .row {
-    height: 120px !important;
-  }
-}
-
-@media (min-width: 640px) and (max-width: 1023px) {
-  .row {
-    height: 180px !important;
-  }
-}

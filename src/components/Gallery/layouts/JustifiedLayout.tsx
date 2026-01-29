@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { ImageItem, LayoutOptions } from '../../../types';
+import { useContainerWidth } from '../../../hooks/useContainerWidth';
 import { GalleryImage } from '../GalleryImage';
 import styles from './JustifiedLayout.module.css';
 
@@ -58,12 +59,10 @@ export function JustifiedLayout({
   onImageClick,
   loading,
 }: JustifiedLayoutProps) {
+  const { ref, width: containerWidth } = useContainerWidth();
   const gap = typeof layout.gap === 'number' ? layout.gap : 16;
   const gapStr = `${gap}px`;
   const targetRowHeight = layout.rowHeight || 240;
-
-  // For SSR/initial render, use a reasonable default width
-  const containerWidth = 1200;
 
   const rows = useMemo(
     () => createJustifiedRows(images, targetRowHeight, containerWidth, gap),
@@ -75,7 +74,7 @@ export function JustifiedLayout({
     images.findIndex((img) => img.id === image.id);
 
   return (
-    <div className={`${styles.justified} gallery-justified`} style={{ gap: gapStr }}>
+    <div ref={ref} className={`${styles.justified} gallery-justified`} style={{ gap: gapStr }}>
       {rows.map((row, rowIndex) => {
         // Calculate actual row height based on aspect ratios
         const gapSpace = (row.images.length - 1) * gap;
