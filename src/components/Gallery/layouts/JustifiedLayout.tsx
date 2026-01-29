@@ -9,6 +9,9 @@ export interface JustifiedLayoutProps {
   layout: LayoutOptions;
   onImageClick?: (image: ImageItem, index: number) => void;
   loading?: 'lazy' | 'eager';
+  /** Not supported for justified layout (row composition depends on full image list) */
+  virtualize?: boolean | number;
+  onImageLoad?: () => void;
 }
 
 interface Row {
@@ -58,6 +61,8 @@ export function JustifiedLayout({
   layout,
   onImageClick,
   loading,
+  virtualize: _virtualize,
+  onImageLoad,
 }: JustifiedLayoutProps) {
   const { ref, width: containerWidth } = useContainerWidth();
   const gap = typeof layout.gap === 'number' ? layout.gap : 16;
@@ -98,6 +103,7 @@ export function JustifiedLayout({
                   index={getOriginalIndex(image)}
                   onClick={onImageClick}
                   loading={loading}
+                  onImageLoad={onImageLoad}
                   className={styles.image}
                 />
               );

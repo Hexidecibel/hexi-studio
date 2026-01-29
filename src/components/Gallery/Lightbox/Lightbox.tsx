@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ImageItem } from '../../../types';
 import { useFocusTrap } from '../../../hooks/useFocusTrap';
@@ -30,10 +30,11 @@ export function Lightbox({
   onNext,
   onPrev,
 }: LightboxProps) {
+  const [isZoomed, setIsZoomed] = useState(false);
   const containerRef = useFocusTrap(isOpen);
   const swipeHandlers = useSwipe({
-    onSwipeLeft: onNext,
-    onSwipeRight: onPrev,
+    onSwipeLeft: isZoomed ? undefined : onNext,
+    onSwipeRight: isZoomed ? undefined : onPrev,
   });
 
   const handleBackdropClick = useCallback(() => {
@@ -71,7 +72,7 @@ export function Lightbox({
       />
 
       <div className={styles.imageContainer} onClick={handleContentClick}>
-        <LightboxImage key={currentImage.id} image={currentImage} />
+        <LightboxImage key={currentImage.id} image={currentImage} onZoomChange={setIsZoomed} />
       </div>
     </div>,
     document.body,

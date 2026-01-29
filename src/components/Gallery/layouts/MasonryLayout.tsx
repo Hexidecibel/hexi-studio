@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { ImageItem, LayoutOptions } from '../../../types';
 import { GalleryImage } from '../GalleryImage';
+import { useVirtualization } from '../../../hooks/useVirtualization';
 import styles from './MasonryLayout.module.css';
 
 export interface MasonryLayoutProps {
@@ -8,6 +9,8 @@ export interface MasonryLayoutProps {
   layout: LayoutOptions;
   onImageClick?: (image: ImageItem, index: number) => void;
   loading?: 'lazy' | 'eager';
+  virtualize?: boolean | number;
+  onImageLoad?: () => void;
 }
 
 function distributeIntoColumns(
@@ -18,13 +21,8 @@ function distributeIntoColumns(
   const columnHeights: number[] = Array(columnCount).fill(0);
 
   images.forEach((image) => {
-    // Find shortest column
     const shortestIndex = columnHeights.indexOf(Math.min(...columnHeights));
-
-    // Add image to shortest column
     columns[shortestIndex].push(image);
-
-    // Update column height (use aspect ratio or default to square)
     const aspectRatio = image.width && image.height
       ? image.height / image.width
       : 1;
@@ -39,37 +37,73 @@ export function MasonryLayout({
   layout,
   onImageClick,
   loading,
+  virtualize,
+  onImageLoad,
 }: MasonryLayoutProps) {
   const gap = typeof layout.gap === 'number' ? `${layout.gap}px` : layout.gap || '16px';
   const columnCount = layout.columns === 'auto' ? 3 : layout.columns || 3;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const columns = useMemo(
     () => distributeIntoColumns(images, columnCount),
     [images, columnCount]
   );
 
-  // Find original index for each image
   const getOriginalIndex = (image: ImageItem) =>
     images.findIndex((img) => img.id === image.id);
 
-  const style: React.CSSProperties = {
+  // Virtualize based on the longest column's item count
+  const enabled = virtualize === true || typeof virtualize === 'number';
+  const maxColumnLength = Math.max(...columns.map((c) => c.length), 0);
+  const { virtualItems, isVirtualized } = useVirtualization({
+    totalCount: maxColumnLength,
+    estimatedItemHeight: 280,
+    containerRef,
+    enabled,
+  });
+
+  const gridStyle: React.CSSProperties = {
     gap,
     gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
   };
 
+  // When virtualized, only render items whose row index falls within the visible range
+  const visibleRowStart = isVirtualized && virtualItems.length > 0
+    ? virtualItems[0].index
+    : 0;
+  const visibleRowEnd = isVirtualized && virtualItems.length > 0
+    ? virtualItems[virtualItems.length - 1].index
+    : maxColumnLength - 1;
+
   return (
-    <div className={`${styles.masonry} gallery-masonry`} style={style}>
+    <div ref={containerRef} className={`${styles.masonry} gallery-masonry`} style={gridStyle}>
       {columns.map((column, colIndex) => (
         <div key={colIndex} className={styles.column} style={{ gap }}>
-          {column.map((image) => (
-            <GalleryImage
-              key={image.id}
-              image={image}
-              index={getOriginalIndex(image)}
-              onClick={onImageClick}
-              loading={loading}
-            />
-          ))}
+          {column.map((image, rowInCol) => {
+            if (isVirtualized && (rowInCol < visibleRowStart || rowInCol > visibleRowEnd)) {
+              // Render a spacer to preserve layout height
+              const aspectRatio = image.width && image.height
+                ? image.height / image.width
+                : 1;
+              return (
+                <div
+                  key={image.id}
+                  style={{ aspectRatio: `1 / ${aspectRatio}`, width: '100%' }}
+                  aria-hidden="true"
+                />
+              );
+            }
+            return (
+              <GalleryImage
+                key={image.id}
+                image={image}
+                index={getOriginalIndex(image)}
+                onClick={onImageClick}
+                loading={loading}
+                onImageLoad={onImageLoad}
+              />
+            );
+          })}
         </div>
       ))}
     </div>

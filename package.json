@@ -81,5 +81,9 @@
   "bugs": {
     "url": "https://github.com/hexi/gallery/issues"
   },
-  "author": ""
+  "author": "",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  }
 }

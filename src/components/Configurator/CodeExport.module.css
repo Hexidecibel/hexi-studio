@@ -1,0 +1,55 @@
+.fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.legend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--hexi-text-muted, #666680);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.codeWrapper {
+  position: relative;
+}
+
+.pre {
+  margin: 0;
+  padding: 12px;
+  background: var(--hexi-bg-secondary, #f8f9fa);
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-md, 8px);
+  overflow-x: auto;
+}
+
+.code {
+  font-size: 0.75rem;
+  font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+  color: var(--hexi-text-primary, #1a1a2e);
+  white-space: pre;
+}
+
+.copyBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-sm, 4px);
+  background: var(--hexi-bg-primary, #fff);
+  color: var(--hexi-text-secondary, #4a4a68);
+  cursor: pointer;
+  transition: all var(--hexi-transition-fast, 150ms ease);
+}
+
+.copyBtn:hover {
+  border-color: var(--hexi-focus-color, #4299e1);
+  color: var(--hexi-focus-color, #4299e1);
+}

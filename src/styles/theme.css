@@ -40,7 +40,7 @@
 
   --hexi-text-primary: #1a1a2e;
   --hexi-text-secondary: #4a4a68;
-  --hexi-text-muted: #8888a0;
+  --hexi-text-muted: #666680;
   --hexi-text-inverse: #ffffff;
 
   /* ===================
@@ -75,7 +75,7 @@
   /* ===================
      Focus / Accessibility
      =================== */
-  --hexi-focus-ring: 0 0 0 3px rgba(66, 153, 225, 0.5);
+  --hexi-focus-ring: 0 0 0 3px rgba(66, 153, 225, 0.8);
   --hexi-focus-color: #4299e1;
 
   /* ===================
@@ -95,7 +95,7 @@
 
     --hexi-text-primary: #f0f0f5;
     --hexi-text-secondary: #b0b0c0;
-    --hexi-text-muted: #707088;
+    --hexi-text-muted: #9090a8;
 
     --hexi-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --hexi-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);

@@ -1,0 +1,73 @@
+.fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.legend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--hexi-text-muted, #666680);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.control {
+  margin-bottom: 12px;
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--hexi-text-secondary, #4a4a68);
+  margin-bottom: 4px;
+}
+
+.slider {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--hexi-focus-color, #4299e1);
+  cursor: pointer;
+}
+
+.columnsRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.numberInput {
+  width: 60px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-sm, 4px);
+  background: var(--hexi-bg-primary, #fff);
+  color: var(--hexi-text-primary, #1a1a2e);
+}
+
+.numberInput:focus {
+  outline: none;
+  border-color: var(--hexi-focus-color, #4299e1);
+}
+
+.autoButton {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-sm, 4px);
+  background: transparent;
+  color: var(--hexi-text-secondary, #4a4a68);
+  cursor: pointer;
+  transition: all var(--hexi-transition-fast, 150ms ease);
+}
+
+.autoButton.active {
+  background: rgba(66, 153, 225, 0.08);
+  border-color: var(--hexi-focus-color, #4299e1);
+  color: var(--hexi-focus-color, #4299e1);
+}

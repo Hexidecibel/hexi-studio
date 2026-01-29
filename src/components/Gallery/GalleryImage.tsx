@@ -9,6 +9,7 @@ export interface GalleryImageProps {
   onClick?: (image: ImageItem, index: number) => void;
   loading?: 'lazy' | 'eager';
   className?: string;
+  onImageLoad?: () => void;
 }
 
 export function GalleryImage({
@@ -17,6 +18,7 @@ export function GalleryImage({
   onClick,
   loading = 'lazy',
   className,
+  onImageLoad,
 }: GalleryImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -24,7 +26,8 @@ export function GalleryImage({
 
   const handleLoad = useCallback(() => {
     setIsLoaded(true);
-  }, []);
+    onImageLoad?.();
+  }, [onImageLoad]);
 
   const handleError = useCallback(() => {
     setHasError(true);

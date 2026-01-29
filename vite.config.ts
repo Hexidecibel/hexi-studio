@@ -41,5 +41,8 @@ export default defineConfig(({ mode }) => {
   // Development configuration
   return {
     plugins: [react()],
+    server: {
+      host: '0.0.0.0',
+    },
   };
 });

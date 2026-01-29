@@ -1,0 +1,119 @@
+.fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.legend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--hexi-text-muted, #666680);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.sourceButtons {
+  display: flex;
+  gap: 0;
+  border-radius: var(--hexi-radius-md, 8px);
+  overflow: hidden;
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  margin-bottom: 12px;
+}
+
+.sourceBtn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--hexi-text-secondary, #4a4a68);
+  cursor: pointer;
+  transition: all var(--hexi-transition-fast, 150ms ease);
+}
+
+.sourceBtn:not(:last-child) {
+  border-right: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+}
+
+.sourceBtn.active {
+  background: rgba(66, 153, 225, 0.08);
+  color: var(--hexi-focus-color, #4299e1);
+}
+
+.urlSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.textarea {
+  width: 100%;
+  padding: 8px;
+  font-size: 0.8rem;
+  font-family: monospace;
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-sm, 4px);
+  background: var(--hexi-bg-primary, #fff);
+  color: var(--hexi-text-primary, #1a1a2e);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--hexi-focus-color, #4299e1);
+}
+
+.submitBtn {
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--hexi-radius-sm, 4px);
+  background: var(--hexi-focus-color, #4299e1);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity var(--hexi-transition-fast, 150ms ease);
+}
+
+.submitBtn:hover {
+  opacity: 0.9;
+}
+
+.uploadSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropZone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  border: 2px dashed var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-md, 8px);
+  background: transparent;
+  color: var(--hexi-text-muted, #666680);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all var(--hexi-transition-fast, 150ms ease);
+}
+
+.dropZone:hover {
+  border-color: var(--hexi-focus-color, #4299e1);
+  color: var(--hexi-focus-color, #4299e1);
+}
+
+.uploadIcon {
+  width: 24px;
+  height: 24px;
+}
+
+.fileInput {
+  display: none;
+}

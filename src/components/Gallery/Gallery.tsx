@@ -15,6 +15,8 @@ export function Gallery({
   onImageClick,
   enableLightbox,
   loading,
+  virtualize,
+  onImageLoad,
 }: GalleryProps) {
   const resolvedLayout = { ...DEFAULT_LAYOUT, ...layout };
   const lightbox = useLightbox({ images });
@@ -36,6 +38,8 @@ export function Gallery({
     layout: resolvedLayout,
     onImageClick: onImageClick || enableLightbox ? handleImageClick : undefined,
     loading,
+    virtualize,
+    onImageLoad,
   };
 
   return (

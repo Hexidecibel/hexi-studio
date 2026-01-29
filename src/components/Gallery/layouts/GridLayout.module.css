@@ -24,6 +24,11 @@
   }
 }
 
+.virtualContainer {
+  display: block;
+  overflow: visible;
+}
+
 /* Square aspect ratio for grid items without dimensions */
 .grid :global(.gallery-image:not([style*="aspect-ratio"])) {
   aspect-ratio: 1;

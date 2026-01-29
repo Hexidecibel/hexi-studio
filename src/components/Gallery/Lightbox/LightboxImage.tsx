@@ -1,14 +1,21 @@
 import { useState, useCallback } from 'react';
 import type { ImageItem } from '../../../types';
+import { usePinchZoom } from '../../../hooks/usePinchZoom';
 import styles from './Lightbox.module.css';
 
 interface LightboxImageProps {
   image: ImageItem;
+  onZoomChange?: (isZoomed: boolean) => void;
 }
 
-export function LightboxImage({ image }: LightboxImageProps) {
+export function LightboxImage({ image, onZoomChange }: LightboxImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  const zoom = usePinchZoom({
+    maxScale: 4,
+    onZoomChange: (scale) => onZoomChange?.(scale > 1),
+  });
 
   const handleLoad = useCallback(() => {
     setIsLoaded(true);
@@ -38,7 +45,7 @@ export function LightboxImage({ image }: LightboxImageProps) {
   }
 
   return (
-    <>
+    <div ref={zoom.ref} className={styles.zoomContainer}>
       {!isLoaded && <div className={styles.spinner} aria-label="Loading image" />}
       <img
         key={image.id}
@@ -48,9 +55,9 @@ export function LightboxImage({ image }: LightboxImageProps) {
         onLoad={handleLoad}
         onError={handleError}
         draggable={false}
-        style={{ opacity: isLoaded ? 1 : 0 }}
+        style={{ opacity: isLoaded ? 1 : 0, ...zoom.style }}
         {...(image.srcSet ? { srcSet: image.srcSet, sizes: '100vw' } : undefined)}
       />
-    </>
+    </div>
   );
 }

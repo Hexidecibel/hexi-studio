@@ -1,0 +1,105 @@
+.panel {
+  position: relative;
+}
+
+.open {
+  display: flex;
+  gap: 24px;
+}
+
+.closed {
+  display: block;
+}
+
+.toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-full, 9999px);
+  background: var(--hexi-bg-primary, #fff);
+  color: var(--hexi-text-secondary, #4a4a68);
+  cursor: pointer;
+  box-shadow: var(--hexi-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
+  transition: all var(--hexi-transition-fast, 150ms ease);
+}
+
+.toggle:hover {
+  background: var(--hexi-bg-secondary, #f8f9fa);
+  color: var(--hexi-text-primary, #1a1a2e);
+}
+
+.toggleIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.content {
+  width: 320px;
+  min-width: 320px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--hexi-bg-primary, #fff);
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-lg, 12px);
+  box-shadow: var(--hexi-shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.16));
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--hexi-text-primary, #1a1a2e);
+}
+
+.resetButton {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--hexi-bg-tertiary, #e9ecef);
+  border-radius: var(--hexi-radius-sm, 4px);
+  background: transparent;
+  color: var(--hexi-text-muted, #666680);
+  cursor: pointer;
+  transition: all var(--hexi-transition-fast, 150ms ease);
+}
+
+.resetButton:hover {
+  border-color: var(--hexi-text-muted, #666680);
+  color: var(--hexi-text-primary, #1a1a2e);
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .open {
+    flex-direction: column;
+  }
+
+  .content {
+    width: 100%;
+    min-width: auto;
+    max-height: 50vh;
+    border-radius: var(--hexi-radius-lg, 12px) var(--hexi-radius-lg, 12px) 0 0;
+  }
+}

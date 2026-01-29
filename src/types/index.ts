@@ -69,6 +69,10 @@ export interface GalleryProps {
   loading?: 'lazy' | 'eager';
   /** Custom render function for images */
   renderImage?: (image: ImageItem, index: number) => React.ReactNode;
+  /** Enable virtualization. true = auto (>50 items), number = custom threshold */
+  virtualize?: boolean | number;
+  /** Callback fired each time an image finishes loading */
+  onImageLoad?: () => void;
 }
 
 /**
@@ -123,6 +127,15 @@ export interface ThemeTokens {
   radiusSm: string;
   radiusMd: string;
   radiusLg: string;
+}
+
+/**
+ * Paginated result for async adapters
+ */
+export interface PaginatedResult {
+  images: ImageItem[];
+  nextCursor?: string;
+  hasMore: boolean;
 }
 
 /**
