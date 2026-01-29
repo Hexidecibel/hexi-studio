@@ -1,0 +1,100 @@
+.wrapper {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--hexi-image-bg, #f5f5f5);
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--hexi-image-radius, 8px);
+  transition: transform var(--hexi-transition-normal, 250ms ease),
+              box-shadow var(--hexi-transition-normal, 250ms ease);
+}
+
+/* Button reset when clickable */
+button.wrapper {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  display: block;
+}
+
+button.wrapper:hover {
+  transform: scale(1.02);
+  box-shadow: var(--hexi-shadow-hover, 0 12px 32px rgba(0,0,0,0.2));
+}
+
+button.wrapper:focus-visible {
+  outline: none;
+  box-shadow: var(--hexi-focus-ring, 0 0 0 3px rgba(66, 153, 225, 0.5));
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--hexi-transition-normal, 250ms ease);
+}
+
+.image.loaded {
+  opacity: 1;
+}
+
+.shimmer {
+  position: absolute;
+  inset: 0;
+  background: var(--hexi-shimmer-color,
+    linear-gradient(
+      90deg,
+      #f0f0f0 0%,
+      #e0e0e0 50%,
+      #f0f0f0 100%
+    )
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--hexi-bg-secondary, #f5f5f5);
+  color: var(--hexi-text-muted, #999);
+}
+
+.errorIcon {
+  width: 32px;
+  height: 32px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .wrapper {
+    transition: none;
+  }
+
+  .image {
+    transition: none;
+    opacity: 1;
+  }
+
+  .shimmer {
+    animation: none;
+  }
+}

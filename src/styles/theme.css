@@ -1,0 +1,114 @@
+/**
+ * @hexi/gallery - Theme Design Tokens
+ *
+ * Override these CSS custom properties to customize the gallery appearance.
+ * All properties are prefixed with --hexi- to avoid conflicts.
+ */
+
+:root {
+  /* ===================
+     Spacing / Gaps
+     =================== */
+  --hexi-gap-xs: 4px;
+  --hexi-gap-sm: 8px;
+  --hexi-gap-md: 16px;
+  --hexi-gap-lg: 24px;
+  --hexi-gap-xl: 32px;
+
+  /* ===================
+     Shadows
+     =================== */
+  --hexi-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --hexi-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --hexi-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --hexi-shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.2);
+
+  /* ===================
+     Transitions
+     =================== */
+  --hexi-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --hexi-transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --hexi-transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ===================
+     Colors
+     =================== */
+  --hexi-bg-primary: #ffffff;
+  --hexi-bg-secondary: #f8f9fa;
+  --hexi-bg-tertiary: #e9ecef;
+  --hexi-bg-overlay: rgba(0, 0, 0, 0.92);
+
+  --hexi-text-primary: #1a1a2e;
+  --hexi-text-secondary: #4a4a68;
+  --hexi-text-muted: #8888a0;
+  --hexi-text-inverse: #ffffff;
+
+  /* ===================
+     Border Radius
+     =================== */
+  --hexi-radius-sm: 4px;
+  --hexi-radius-md: 8px;
+  --hexi-radius-lg: 12px;
+  --hexi-radius-xl: 16px;
+  --hexi-radius-full: 9999px;
+
+  /* ===================
+     Image Specific
+     =================== */
+  --hexi-image-radius: var(--hexi-radius-md);
+  --hexi-image-bg: var(--hexi-bg-secondary);
+  --hexi-shimmer-color: linear-gradient(
+    90deg,
+    var(--hexi-bg-secondary) 0%,
+    var(--hexi-bg-tertiary) 50%,
+    var(--hexi-bg-secondary) 100%
+  );
+
+  /* ===================
+     Lightbox
+     =================== */
+  --hexi-lightbox-bg: var(--hexi-bg-overlay);
+  --hexi-lightbox-text: var(--hexi-text-inverse);
+  --hexi-lightbox-button-bg: rgba(255, 255, 255, 0.1);
+  --hexi-lightbox-button-hover: rgba(255, 255, 255, 0.2);
+
+  /* ===================
+     Focus / Accessibility
+     =================== */
+  --hexi-focus-ring: 0 0 0 3px rgba(66, 153, 225, 0.5);
+  --hexi-focus-color: #4299e1;
+
+  /* ===================
+     Z-Index Scale
+     =================== */
+  --hexi-z-gallery: 1;
+  --hexi-z-lightbox: 1000;
+  --hexi-z-lightbox-controls: 1001;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hexi-bg-primary: #1a1a2e;
+    --hexi-bg-secondary: #252540;
+    --hexi-bg-tertiary: #2d2d4a;
+
+    --hexi-text-primary: #f0f0f5;
+    --hexi-text-secondary: #b0b0c0;
+    --hexi-text-muted: #707088;
+
+    --hexi-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --hexi-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --hexi-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --hexi-shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --hexi-transition-fast: 0ms;
+    --hexi-transition-normal: 0ms;
+    --hexi-transition-slow: 0ms;
+  }
+}
