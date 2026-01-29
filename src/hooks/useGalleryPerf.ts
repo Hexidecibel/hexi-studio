@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export interface GalleryPerfMetrics {
   renderCount: number;
@@ -17,6 +17,19 @@ export function useGalleryPerf(totalImages: number): GalleryPerfMetrics & {
   const [imagesLoaded, setImagesLoaded] = useState(0);
   const [timeToFirstImage, setTimeToFirstImage] = useState<number | null>(null);
   const [timeToAllImages, setTimeToAllImages] = useState<number | null>(null);
+
+  // Reset when total changes (e.g. user switches from 200 to 50 images)
+  const prevTotal = useRef(totalImages);
+  useEffect(() => {
+    if (totalImages !== prevTotal.current) {
+      prevTotal.current = totalImages;
+      setImagesLoaded(0);
+      setTimeToFirstImage(null);
+      setTimeToAllImages(null);
+      firstImageRecorded.current = false;
+      mountTime.current = performance.now();
+    }
+  }, [totalImages]);
 
   const renderCountRef = useRef(0);
   const renderDurations = useRef<number[]>([]);
@@ -60,13 +73,14 @@ export function useGalleryPerf(totalImages: number): GalleryPerfMetrics & {
       ? renderDurations.current[renderDurations.current.length - 1]
       : 0;
 
-  const loadProgress = totalImages > 0 ? imagesLoaded / totalImages : 0;
+  const clampedLoaded = Math.min(imagesLoaded, totalImages);
+  const loadProgress = totalImages > 0 ? Math.min(clampedLoaded / totalImages, 1) : 0;
 
   return {
     renderCount: renderCountRef.current,
     lastRenderDuration,
     averageRenderDuration,
-    imagesLoaded,
+    imagesLoaded: clampedLoaded,
     imagesTotal: totalImages,
     loadProgress,
     timeToFirstImage,
