@@ -1,3 +1,6 @@
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 import { serve } from '@hono/node-server';
 import { app } from './app';
 
