@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, AdapterVariables } from '../types';
+import type { StorageObject } from '../adapters/storage';
 
-export const cdnRoutes = new Hono<{ Bindings: Env }>();
+export const cdnRoutes = new Hono<{ Bindings: Env; Variables: AdapterVariables }>();
 
 /**
  * Parse variant string into Cloudflare Image Resizing options.
@@ -60,14 +61,14 @@ cdnRoutes.get('/:tenantId/:mediaId/:variant', async (c) => {
   }
 
   // Look up the media record to find the R2 key (check both media and library_media tables)
-  let media = await c.env.DB.prepare(
+  let media = await c.get('db').prepare(
     'SELECT r2_key, content_type FROM media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   )
     .bind(mediaId, tenantId)
     .first<{ r2_key: string; content_type: string }>();
 
   if (!media) {
-    media = await c.env.DB.prepare(
+    media = await c.get('db').prepare(
       'SELECT r2_key, content_type FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
     )
       .bind(mediaId, tenantId)
@@ -80,8 +81,8 @@ cdnRoutes.get('/:tenantId/:mediaId/:variant', async (c) => {
 
   const variantOpts = parseVariant(variant);
 
-  // Fetch from R2
-  const object = await c.env.MEDIA_BUCKET.get(media.r2_key);
+  // Fetch from storage
+  const object = await c.get('storage').get(media.r2_key);
   if (!object) {
     return c.json({ error: 'Object not found in storage' }, 404);
   }
@@ -99,7 +100,7 @@ cdnRoutes.get('/:tenantId/:mediaId/:variant', async (c) => {
 
   // For original variant or non-image types, serve directly from R2
   if (variantOpts.isOriginal || !media.content_type.startsWith('image/')) {
-    return new Response(object.body as ReadableStream, { headers });
+    return new Response(object.body, { headers });
   }
 
   // For image transforms, we need to use Cloudflare Image Resizing.
@@ -114,7 +115,7 @@ cdnRoutes.get('/:tenantId/:mediaId/:variant', async (c) => {
   // For now, serve the original with cache headers and let the client handle sizing via srcSet.
   // When deployed with a public R2 bucket + custom domain, replace this with Image Resizing.
 
-  return new Response(object.body as ReadableStream, { headers });
+  return new Response(object.body, { headers });
 });
 
 // Also handle requests without variant (default to original)
@@ -122,14 +123,14 @@ cdnRoutes.get('/:tenantId/:mediaId', async (c) => {
   const tenantId = c.req.param('tenantId');
   const mediaId = c.req.param('mediaId');
 
-  let media = await c.env.DB.prepare(
+  let media = await c.get('db').prepare(
     'SELECT r2_key, content_type FROM media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   )
     .bind(mediaId, tenantId)
     .first<{ r2_key: string; content_type: string }>();
 
   if (!media) {
-    media = await c.env.DB.prepare(
+    media = await c.get('db').prepare(
       'SELECT r2_key, content_type FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
     )
       .bind(mediaId, tenantId)
@@ -140,7 +141,7 @@ cdnRoutes.get('/:tenantId/:mediaId', async (c) => {
     return c.json({ error: 'Not found' }, 404);
   }
 
-  const object = await c.env.MEDIA_BUCKET.get(media.r2_key);
+  const object = await c.get('storage').get(media.r2_key);
   if (!object) {
     return c.json({ error: 'Object not found in storage' }, 404);
   }
@@ -155,5 +156,5 @@ cdnRoutes.get('/:tenantId/:mediaId', async (c) => {
     return new Response(null, { status: 304, headers });
   }
 
-  return new Response(object.body as ReadableStream, { headers });
+  return new Response(object.body, { headers });
 });

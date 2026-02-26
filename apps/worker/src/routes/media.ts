@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
-import type { Env, AuthVariables } from '../types';
+import type { Env, AuthVariables, AdapterVariables } from '../types';
 import { rateLimit } from '../middleware/rateLimit';
 import { generateId } from '../utils/crypto';
 import { isAllowedMediaType, getMediaType, getFileExtension } from '../utils/validation';
+import type { DatabaseAdapter } from '../adapters/database';
 
-export const mediaRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+export const mediaRoutes = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVariables }>();
 
 // Rate limit uploads: 30 per minute
 mediaRoutes.use('/upload-url', rateLimit({ windowMs: 60 * 1000, maxRequests: 30 }));
@@ -13,7 +14,7 @@ mediaRoutes.use('/upload-url', rateLimit({ windowMs: 60 * 1000, maxRequests: 30 
  * Helper to get gallery ID and verify ownership.
  */
 async function getGalleryForUser(
-  db: Env['DB'],
+  db: DatabaseAdapter,
   galleryId: string,
   userId: string
 ): Promise<{ id: string } | null> {
@@ -46,7 +47,7 @@ mediaRoutes.post('/upload-url', async (c) => {
     return c.json({ error: 'Gallery ID is required' }, 400);
   }
 
-  const gallery = await getGalleryForUser(c.env.DB, galleryId, user.id);
+  const gallery = await getGalleryForUser(c.get('db'), galleryId, user.id);
   if (!gallery) {
     return c.json({ error: 'Gallery not found' }, 404);
   }
@@ -106,7 +107,7 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
     return c.json({ error: 'Gallery ID and media ID are required' }, 400);
   }
 
-  const gallery = await getGalleryForUser(c.env.DB, galleryId, user.id);
+  const gallery = await getGalleryForUser(c.get('db'), galleryId, user.id);
   if (!gallery) {
     return c.json({ error: 'Gallery not found' }, 404);
   }
@@ -128,12 +129,12 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
   const r2Key = `tenants/${user.id}/media/${mediaId}/original.${ext}`;
 
   // Upload to R2
-  await c.env.MEDIA_BUCKET.put(r2Key, body, {
+  await c.get('storage').put(r2Key, body, {
     httpMetadata: { contentType },
   });
 
   // Get next sort order
-  const maxOrder = await c.env.DB.prepare(
+  const maxOrder = await c.get('db').prepare(
     'SELECT MAX(sort_order) as max_order FROM media WHERE gallery_id = ? AND deleted_at IS NULL'
   )
     .bind(galleryId)
@@ -145,7 +146,7 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
   const filename = `original.${ext}`;
   const mediaType = getMediaType(contentType);
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `INSERT INTO media (id, gallery_id, user_id, filename, content_type, file_size, r2_key, media_type, sort_order, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready')`
   )
@@ -153,13 +154,13 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
     .run();
 
   // Update user storage
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     'UPDATE users SET storage_used_bytes = storage_used_bytes + ? WHERE id = ?'
   )
     .bind(fileSize, user.id)
     .run();
 
-  const media = await c.env.DB.prepare('SELECT * FROM media WHERE id = ?')
+  const media = await c.get('db').prepare('SELECT * FROM media WHERE id = ?')
     .bind(mediaId)
     .first();
 
@@ -175,7 +176,7 @@ mediaRoutes.post('/confirm', async (c) => {
     return c.json({ error: 'Gallery ID is required' }, 400);
   }
 
-  const gallery = await getGalleryForUser(c.env.DB, galleryId, user.id);
+  const gallery = await getGalleryForUser(c.get('db'), galleryId, user.id);
   if (!gallery) {
     return c.json({ error: 'Gallery not found' }, 404);
   }
@@ -195,7 +196,7 @@ mediaRoutes.post('/confirm', async (c) => {
   }
 
   // Verify media belongs to this gallery and user
-  const media = await c.env.DB.prepare(
+  const media = await c.get('db').prepare(
     'SELECT id, status FROM media WHERE id = ? AND gallery_id = ? AND user_id = ? AND deleted_at IS NULL'
   )
     .bind(body.mediaId, galleryId, user.id)
@@ -219,13 +220,13 @@ mediaRoutes.post('/confirm', async (c) => {
   updates.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')");
   values.push(body.mediaId);
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `UPDATE media SET ${updates.join(', ')} WHERE id = ?`
   )
     .bind(...values)
     .run();
 
-  const updated = await c.env.DB.prepare('SELECT * FROM media WHERE id = ?')
+  const updated = await c.get('db').prepare('SELECT * FROM media WHERE id = ?')
     .bind(body.mediaId)
     .first();
 
@@ -241,7 +242,7 @@ mediaRoutes.get('/', async (c) => {
     return c.json({ error: 'Gallery ID is required' }, 400);
   }
 
-  const gallery = await getGalleryForUser(c.env.DB, galleryId, user.id);
+  const gallery = await getGalleryForUser(c.get('db'), galleryId, user.id);
   if (!gallery) {
     return c.json({ error: 'Gallery not found' }, 404);
   }
@@ -251,7 +252,7 @@ mediaRoutes.get('/', async (c) => {
   const offset = (page - 1) * limit;
 
   const [items, countResult] = await Promise.all([
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT * FROM media
        WHERE gallery_id = ? AND user_id = ? AND deleted_at IS NULL
        ORDER BY sort_order ASC, created_at ASC
@@ -259,7 +260,7 @@ mediaRoutes.get('/', async (c) => {
     )
       .bind(galleryId, user.id, limit, offset)
       .all(),
-    c.env.DB.prepare(
+    c.get('db').prepare(
       'SELECT COUNT(*) as total FROM media WHERE gallery_id = ? AND user_id = ? AND deleted_at IS NULL'
     )
       .bind(galleryId, user.id)
@@ -290,7 +291,7 @@ mediaRoutes.patch('/:mid', async (c) => {
   }
 
   // Verify ownership
-  const media = await c.env.DB.prepare(
+  const media = await c.get('db').prepare(
     'SELECT id FROM media WHERE id = ? AND gallery_id = ? AND user_id = ? AND deleted_at IS NULL'
   )
     .bind(mid, galleryId, user.id)
@@ -324,13 +325,13 @@ mediaRoutes.patch('/:mid', async (c) => {
   updates.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')");
   values.push(mid, user.id);
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `UPDATE media SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`
   )
     .bind(...values)
     .run();
 
-  const updated = await c.env.DB.prepare('SELECT * FROM media WHERE id = ?')
+  const updated = await c.get('db').prepare('SELECT * FROM media WHERE id = ?')
     .bind(mid)
     .first();
 
@@ -347,7 +348,7 @@ mediaRoutes.delete('/:mid', async (c) => {
     return c.json({ error: 'Gallery ID and media ID are required' }, 400);
   }
 
-  const media = await c.env.DB.prepare(
+  const media = await c.get('db').prepare(
     'SELECT id, r2_key, file_size FROM media WHERE id = ? AND gallery_id = ? AND user_id = ? AND deleted_at IS NULL'
   )
     .bind(mid, galleryId, user.id)
@@ -358,7 +359,7 @@ mediaRoutes.delete('/:mid', async (c) => {
   }
 
   // Soft-delete the media record
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     "UPDATE media SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
   )
     .bind(mid)
@@ -366,13 +367,13 @@ mediaRoutes.delete('/:mid', async (c) => {
 
   // Delete from R2
   try {
-    await c.env.MEDIA_BUCKET.delete(media.r2_key);
+    await c.get('storage').delete(media.r2_key as string);
   } catch (err) {
     console.error('Failed to delete R2 object:', err);
   }
 
   // Update user storage
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     'UPDATE users SET storage_used_bytes = MAX(0, storage_used_bytes - ?) WHERE id = ?'
   )
     .bind(media.file_size, user.id)
@@ -390,7 +391,7 @@ mediaRoutes.post('/reorder', async (c) => {
     return c.json({ error: 'Gallery ID is required' }, 400);
   }
 
-  const gallery = await getGalleryForUser(c.env.DB, galleryId, user.id);
+  const gallery = await getGalleryForUser(c.get('db'), galleryId, user.id);
   if (!gallery) {
     return c.json({ error: 'Gallery not found' }, 404);
   }
@@ -405,14 +406,14 @@ mediaRoutes.post('/reorder', async (c) => {
 
   // Update sort_order for each media item
   const stmts = body.order.map((mediaId, index) =>
-    c.env.DB.prepare(
+    c.get('db').prepare(
       "UPDATE media SET sort_order = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND gallery_id = ? AND user_id = ?"
     ).bind(index, mediaId, galleryId, user.id)
   );
 
   // Execute as batch
   if (stmts.length > 0) {
-    await c.env.DB.batch(stmts);
+    await c.get('db').batch(stmts);
   }
 
   return c.json({ message: 'Reordered', count: stmts.length });

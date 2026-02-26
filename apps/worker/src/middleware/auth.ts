@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import type { Env, AuthUser, AuthVariables } from '../types';
+import type { Env, AuthUser, AuthVariables, AdapterVariables } from '../types';
 import { hashToken } from '../utils/crypto';
 
 /**
@@ -8,7 +8,7 @@ import { hashToken } from '../utils/crypto';
  */
 export const requireAuth = createMiddleware<{
   Bindings: Env;
-  Variables: AuthVariables;
+  Variables: AdapterVariables & AuthVariables;
 }>(async (c, next) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -22,7 +22,7 @@ export const requireAuth = createMiddleware<{
 
   const tokenHash = await hashToken(token);
 
-  const session = await c.env.DB.prepare(
+  const session = await c.get('db').prepare(
     `SELECT s.user_id, s.expires_at, u.id, u.email, u.name, u.plan, u.storage_used_bytes, u.storage_limit_bytes
      FROM sessions s
      JOIN users u ON s.user_id = u.id

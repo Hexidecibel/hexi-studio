@@ -1,4 +1,7 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { StorageAdapter } from './adapters/storage';
+import type { DatabaseAdapter } from './adapters/database';
+import type { ImageTransformer } from './adapters/image-transform';
 
 export interface Env {
   DB: D1Database;
@@ -28,4 +31,10 @@ export interface AuthUser {
 
 export type AuthVariables = {
   user: AuthUser;
+};
+
+export type AdapterVariables = {
+  storage: StorageAdapter;
+  db: DatabaseAdapter;
+  imageTransformer: ImageTransformer;
 };

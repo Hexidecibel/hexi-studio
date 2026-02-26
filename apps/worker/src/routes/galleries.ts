@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
-import type { Env, AuthVariables } from '../types';
+import type { Env, AuthVariables, AdapterVariables } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { generateId } from '../utils/crypto';
 import { isValidSlug, sanitizeSlug } from '../utils/validation';
 import { mediaRoutes } from './media';
 
-export const galleryRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+export const galleryRoutes = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVariables }>();
 
 // All gallery routes require auth
 galleryRoutes.use('*', requireAuth);
@@ -27,7 +27,7 @@ galleryRoutes.post('/', async (c) => {
   }
 
   // Check for slug uniqueness within user's galleries
-  const existing = await c.env.DB.prepare(
+  const existing = await c.get('db').prepare(
     `SELECT id FROM galleries WHERE user_id = ? AND slug = ? AND deleted_at IS NULL`
   )
     .bind(user.id, slug)
@@ -40,13 +40,13 @@ galleryRoutes.post('/', async (c) => {
   const id = generateId();
   const config = JSON.stringify(body.config || {});
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `INSERT INTO galleries (id, user_id, name, slug, config) VALUES (?, ?, ?, ?, ?)`
   )
     .bind(id, user.id, name, slug, config)
     .run();
 
-  const gallery = await c.env.DB.prepare(
+  const gallery = await c.get('db').prepare(
     `SELECT id, name, slug, config, published, created_at, updated_at FROM galleries WHERE id = ?`
   )
     .bind(id)
@@ -63,7 +63,7 @@ galleryRoutes.get('/', async (c) => {
   const offset = (page - 1) * limit;
 
   const [galleries, countResult] = await Promise.all([
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT g.id, g.name, g.slug, g.config, g.published, g.created_at, g.updated_at,
               (SELECT COUNT(*) FROM media m WHERE m.gallery_id = g.id AND m.deleted_at IS NULL) as media_count
        FROM galleries g
@@ -73,7 +73,7 @@ galleryRoutes.get('/', async (c) => {
     )
       .bind(user.id, limit, offset)
       .all(),
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT COUNT(*) as total FROM galleries WHERE user_id = ? AND deleted_at IS NULL`
     )
       .bind(user.id)
@@ -102,7 +102,7 @@ galleryRoutes.get('/:id', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
 
-  const gallery = await c.env.DB.prepare(
+  const gallery = await c.get('db').prepare(
     `SELECT g.id, g.name, g.slug, g.config, g.published, g.created_at, g.updated_at,
             (SELECT COUNT(*) FROM media m WHERE m.gallery_id = g.id AND m.deleted_at IS NULL) as media_count
      FROM galleries g
@@ -130,7 +130,7 @@ galleryRoutes.patch('/:id', async (c) => {
   }>().catch(() => ({} as { name?: string; slug?: string; config?: Record<string, unknown>; published?: boolean }));
 
   // Verify gallery exists and belongs to user
-  const existing = await c.env.DB.prepare(
+  const existing = await c.get('db').prepare(
     `SELECT id FROM galleries WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
   )
     .bind(id, user.id)
@@ -159,7 +159,7 @@ galleryRoutes.patch('/:id', async (c) => {
       return c.json({ error: 'Invalid slug' }, 400);
     }
     // Check uniqueness (excluding self)
-    const slugConflict = await c.env.DB.prepare(
+    const slugConflict = await c.get('db').prepare(
       `SELECT id FROM galleries WHERE user_id = ? AND slug = ? AND id != ? AND deleted_at IS NULL`
     )
       .bind(user.id, slug, id)
@@ -188,14 +188,14 @@ galleryRoutes.patch('/:id', async (c) => {
   updates.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')");
   values.push(id, user.id);
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `UPDATE galleries SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`
   )
     .bind(...values)
     .run();
 
   // Fetch and return updated gallery
-  const gallery = await c.env.DB.prepare(
+  const gallery = await c.get('db').prepare(
     `SELECT g.id, g.name, g.slug, g.config, g.published, g.created_at, g.updated_at,
             (SELECT COUNT(*) FROM media m WHERE m.gallery_id = g.id AND m.deleted_at IS NULL) as media_count
      FROM galleries g
@@ -212,7 +212,7 @@ galleryRoutes.delete('/:id', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
 
-  const existing = await c.env.DB.prepare(
+  const existing = await c.get('db').prepare(
     `SELECT id FROM galleries WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
   )
     .bind(id, user.id)
@@ -222,7 +222,7 @@ galleryRoutes.delete('/:id', async (c) => {
     return c.json({ error: 'Gallery not found' }, 404);
   }
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `UPDATE galleries SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
   )
     .bind(id)

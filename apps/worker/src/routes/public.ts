@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, AdapterVariables } from '../types';
+import type { AuthVariables } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { requireAuth } from '../middleware/auth';
 
-export const publicRoutes = new Hono<{ Bindings: Env }>();
+export const publicRoutes = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVariables }>();
 
 // Rate limit public reads: 200 per minute
 publicRoutes.use('*', rateLimit({ windowMs: 60 * 1000, maxRequests: 200 }));
@@ -75,7 +76,7 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
   const galleryId = c.req.param('id');
   const user = c.get('user') as { id: string };
 
-  const gallery = await c.env.DB.prepare(
+  const gallery = await c.get('db').prepare(
     `SELECT id, user_id, name, slug, config
      FROM galleries
      WHERE id = ? AND user_id = ? AND deleted_at IS NULL
@@ -92,7 +93,7 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
   const limit = 200;
 
   const [mediaResult, countResult] = await Promise.all([
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT id, media_type, width, height, alt, title, description, duration,
               poster_r2_key, blur_data_url, sort_order
        FROM media
@@ -102,7 +103,7 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
     )
       .bind(gallery.id, gallery.user_id, limit)
       .all(),
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT COUNT(*) as total FROM media
        WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL`
     )
@@ -135,7 +136,7 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
 publicRoutes.get('/media/:id', async (c) => {
   const id = c.req.param('id');
 
-  const item = await c.env.DB.prepare(
+  const item = await c.get('db').prepare(
     "SELECT id, user_id, width, height, alt, title, description, media_type, content_type FROM library_media WHERE id = ? AND status = 'ready' AND deleted_at IS NULL"
   ).bind(id).first();
 
@@ -178,7 +179,7 @@ publicRoutes.get('/galleries/:slug', async (c) => {
   }
 
   // Find published gallery by slug (across all users)
-  const gallery = await c.env.DB.prepare(
+  const gallery = await c.get('db').prepare(
     `SELECT g.id, g.user_id, g.name, g.slug, g.config
      FROM galleries g
      WHERE g.slug = ? AND g.published = 1 AND g.deleted_at IS NULL
@@ -196,7 +197,7 @@ publicRoutes.get('/galleries/:slug', async (c) => {
 
   // Fetch first page of media
   const [mediaResult, countResult] = await Promise.all([
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT id, media_type, width, height, alt, title, description, duration,
               poster_r2_key, blur_data_url, sort_order
        FROM media
@@ -206,7 +207,7 @@ publicRoutes.get('/galleries/:slug', async (c) => {
     )
       .bind(gallery.id, gallery.user_id, limit)
       .all(),
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT COUNT(*) as total FROM media
        WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL`
     )
@@ -243,7 +244,7 @@ publicRoutes.get('/galleries/:slug/media', async (c) => {
     return c.json({ error: 'Gallery slug is required' }, 400);
   }
 
-  const gallery = await c.env.DB.prepare(
+  const gallery = await c.get('db').prepare(
     `SELECT id, user_id FROM galleries
      WHERE slug = ? AND published = 1 AND deleted_at IS NULL
      LIMIT 1`
@@ -262,7 +263,7 @@ publicRoutes.get('/galleries/:slug/media', async (c) => {
   const cdnBase = c.env.CDN_BASE_URL || '';
 
   const [mediaResult, countResult] = await Promise.all([
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT id, media_type, width, height, alt, title, description, duration,
               poster_r2_key, blur_data_url, sort_order
        FROM media
@@ -272,7 +273,7 @@ publicRoutes.get('/galleries/:slug/media', async (c) => {
     )
       .bind(gallery.id, gallery.user_id, limit, offset)
       .all(),
-    c.env.DB.prepare(
+    c.get('db').prepare(
       `SELECT COUNT(*) as total FROM media
        WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL`
     )

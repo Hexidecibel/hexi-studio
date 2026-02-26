@@ -1,5 +1,14 @@
 import type { Env } from '../types';
-import { connect } from 'cloudflare:sockets';
+
+// cloudflare:sockets is only available in Cloudflare Workers runtime.
+// In Node.js/local mode, we fall back to nodemailer for SMTP.
+let connect: typeof import('cloudflare:sockets').connect | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  connect = require('cloudflare:sockets').connect;
+} catch {
+  // Not in Cloudflare Workers — connect will be undefined
+}
 
 interface SendEmailParams {
   to: string;
@@ -9,12 +18,22 @@ interface SendEmailParams {
 
 /**
  * Send email using the best available method:
- * 1. SMTP (if SMTP_HOST is configured)
- * 2. Resend API (if RESEND_API_KEY is configured)
- * 3. Console.log fallback (development)
+ * 1. SMTP via Cloudflare Workers TCP sockets (if running in Workers and SMTP_HOST is configured)
+ * 2. SMTP via nodemailer (if running in Node.js/local mode and SMTP_HOST is configured)
+ * 3. Resend API (if RESEND_API_KEY is configured)
+ * 4. Console.log fallback (development)
  */
 export async function sendEmail(env: Env, params: SendEmailParams): Promise<boolean> {
   if (env.SMTP_HOST) {
+    // Detect Node.js/local runtime — use nodemailer instead of cloudflare:sockets
+    const isLocalMode =
+      typeof globalThis.process !== 'undefined' &&
+      globalThis.process.env?.RUNTIME_MODE === 'local';
+
+    if (isLocalMode || !connect) {
+      return sendViaSMTPNodemailer(env, params);
+    }
+
     return sendViaSMTP(env, params);
   }
 
@@ -40,6 +59,11 @@ export async function sendEmail(env: Env, params: SendEmailParams): Promise<bool
  * Supports STARTTLS and AUTH LOGIN.
  */
 async function sendViaSMTP(env: Env, params: SendEmailParams): Promise<boolean> {
+  if (!connect) {
+    console.error('SMTP: cloudflare:sockets is not available in this runtime');
+    return false;
+  }
+
   const host = env.SMTP_HOST!;
   const port = parseInt(env.SMTP_PORT || '587');
   const user = env.SMTP_USER || '';
@@ -143,6 +167,43 @@ async function sendViaSMTP(env: Env, params: SendEmailParams): Promise<boolean> 
     return dataResp.startsWith('250');
   } catch (error) {
     console.error('SMTP send error:', error);
+    return false;
+  }
+}
+
+/**
+ * Send email via SMTP using nodemailer.
+ * Used in Node.js/local mode where cloudflare:sockets is unavailable.
+ */
+async function sendViaSMTPNodemailer(env: Env, params: SendEmailParams): Promise<boolean> {
+  try {
+    const nodemailer = await import('nodemailer');
+    const host = env.SMTP_HOST!;
+    const port = parseInt(env.SMTP_PORT || '587');
+    const from = env.SMTP_FROM || `Hexi Gallery <noreply@${host}>`;
+
+    const transport = nodemailer.default.createTransport({
+      host,
+      port,
+      secure: env.SMTP_PORT === '465',
+      auth: env.SMTP_USER
+        ? {
+            user: env.SMTP_USER,
+            pass: env.SMTP_PASS,
+          }
+        : undefined,
+    });
+
+    await transport.sendMail({
+      from,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('SMTP (nodemailer) send error:', error);
     return false;
   }
 }

@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, AdapterVariables } from '../types';
 import type { AuthVariables } from '../middleware/auth';
 import { requireAuth } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { generateId } from '../utils/crypto';
 import { isAllowedMediaType, getMediaType, getFileExtension } from '../utils/validation';
 
-const library = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+const library = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVariables }>();
 
 // All library routes require auth
 library.use('*', requireAuth);
@@ -44,7 +44,7 @@ library.post('/upload', rateLimit({ windowMs: 60 * 1000, maxRequests: 30 }), asy
   const mediaType = getMediaType(contentType);
 
   // Create pending record
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `INSERT INTO library_media (id, user_id, filename, content_type, file_size, r2_key, media_type, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`
   ).bind(mediaId, user.id, filename, contentType, fileSize, r2Key, mediaType).run();
@@ -64,7 +64,7 @@ library.put('/:mediaId/upload', async (c) => {
   const user = c.get('user');
   const mediaId = c.req.param('mediaId');
 
-  const record = await c.env.DB.prepare(
+  const record = await c.get('db').prepare(
     'SELECT * FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   ).bind(mediaId, user.id).first();
 
@@ -73,16 +73,16 @@ library.put('/:mediaId/upload', async (c) => {
   }
 
   const body = await c.req.arrayBuffer();
-  await c.env.MEDIA_BUCKET.put(record.r2_key as string, body, {
+  await c.get('storage').put(record.r2_key as string, body, {
     httpMetadata: { contentType: record.content_type as string },
   });
 
   // Update status and storage
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     "UPDATE library_media SET status = 'ready', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
   ).bind(mediaId).run();
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     'UPDATE users SET storage_used_bytes = storage_used_bytes + ? WHERE id = ?'
   ).bind(record.file_size, user.id).run();
 
@@ -106,7 +106,7 @@ library.post('/confirm', async (c) => {
     return c.json({ error: 'Missing mediaId' }, 400);
   }
 
-  const record = await c.env.DB.prepare(
+  const record = await c.get('db').prepare(
     'SELECT * FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   ).bind(mediaId, user.id).first();
 
@@ -128,10 +128,10 @@ library.post('/confirm', async (c) => {
     updates.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')");
     const sql = `UPDATE library_media SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`;
     values.push(mediaId, user.id);
-    await c.env.DB.prepare(sql).bind(...values).run();
+    await c.get('db').prepare(sql).bind(...values).run();
   }
 
-  const updated = await c.env.DB.prepare(
+  const updated = await c.get('db').prepare(
     'SELECT * FROM library_media WHERE id = ? AND user_id = ?'
   ).bind(mediaId, user.id).first();
 
@@ -159,11 +159,11 @@ library.get('/', async (c) => {
 
   listSql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
 
-  const countResult = await c.env.DB.prepare(countSql).bind(...bindings).first();
+  const countResult = await c.get('db').prepare(countSql).bind(...bindings).first();
   const total = (countResult?.total as number) || 0;
 
   const listBindings = [...bindings, limit, offset];
-  const items = await c.env.DB.prepare(listSql).bind(...listBindings).all();
+  const items = await c.get('db').prepare(listSql).bind(...listBindings).all();
 
   return c.json({
     data: items.results,
@@ -181,7 +181,7 @@ library.get('/:id', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
 
-  const item = await c.env.DB.prepare(
+  const item = await c.get('db').prepare(
     'SELECT * FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   ).bind(id, user.id).first();
 
@@ -203,7 +203,7 @@ library.patch('/:id', async (c) => {
     tags?: string[];
   }>();
 
-  const item = await c.env.DB.prepare(
+  const item = await c.get('db').prepare(
     'SELECT * FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   ).bind(id, user.id).first();
 
@@ -226,9 +226,9 @@ library.patch('/:id', async (c) => {
   updates.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')");
   const sql = `UPDATE library_media SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`;
   values.push(id, user.id);
-  await c.env.DB.prepare(sql).bind(...values).run();
+  await c.get('db').prepare(sql).bind(...values).run();
 
-  const updated = await c.env.DB.prepare(
+  const updated = await c.get('db').prepare(
     'SELECT * FROM library_media WHERE id = ? AND user_id = ?'
   ).bind(id, user.id).first();
 
@@ -240,7 +240,7 @@ library.delete('/:id', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
 
-  const item = await c.env.DB.prepare(
+  const item = await c.get('db').prepare(
     'SELECT * FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   ).bind(id, user.id).first();
 
@@ -249,19 +249,19 @@ library.delete('/:id', async (c) => {
   }
 
   // Soft-delete
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     "UPDATE library_media SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
   ).bind(id).run();
 
   // Delete from R2
   try {
-    await c.env.MEDIA_BUCKET.delete(item.r2_key as string);
+    await c.get('storage').delete(item.r2_key as string);
   } catch (err) {
     console.error('Failed to delete from R2:', err);
   }
 
   // Reduce storage
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     'UPDATE users SET storage_used_bytes = MAX(0, storage_used_bytes - ?) WHERE id = ?'
   ).bind(item.file_size, user.id).run();
 

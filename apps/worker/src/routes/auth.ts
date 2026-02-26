@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
-import type { D1Database } from '@cloudflare/workers-types';
-import type { Env, AuthVariables } from '../types';
+import type { Env, AuthVariables, AdapterVariables } from '../types';
+import type { DatabaseAdapter } from '../adapters/database';
 import { requireAuth } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { generateToken, hashToken, generateId } from '../utils/crypto';
 import { isValidEmail } from '../utils/validation';
 import { sendEmail, buildMagicLinkEmail } from '../services/email';
 
-async function createSession(db: D1Database, userId: string): Promise<{ token: string; expiresAt: string }> {
+async function createSession(db: DatabaseAdapter, userId: string): Promise<{ token: string; expiresAt: string }> {
   const sessionToken = generateToken();
   const sessionHash = await hashToken(sessionToken);
   const sessionId = generateId();
@@ -20,7 +20,7 @@ async function createSession(db: D1Database, userId: string): Promise<{ token: s
   return { token: sessionToken, expiresAt };
 }
 
-export const authRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+export const authRoutes = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVariables }>();
 
 // Rate limit magic link requests: 5 per 15 minutes
 authRoutes.use('/magic-link', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 5 }));
@@ -41,7 +41,7 @@ authRoutes.post('/magic-link', async (c) => {
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
 
   // Store token hash in D1
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `INSERT INTO magic_link_tokens (id, email, token_hash, expires_at) VALUES (?, ?, ?, ?)`
   )
     .bind(id, email, tokenHash, expiresAt)
@@ -75,7 +75,7 @@ authRoutes.get('/verify', async (c) => {
   const tokenHash = await hashToken(token);
 
   // Find and validate the magic link token
-  const magicLink = await c.env.DB.prepare(
+  const magicLink = await c.get('db').prepare(
     `SELECT id, email, expires_at, used_at FROM magic_link_tokens
      WHERE token_hash = ? AND email = ? AND used_at IS NULL AND expires_at > datetime('now')`
   )
@@ -87,27 +87,27 @@ authRoutes.get('/verify', async (c) => {
   }
 
   // Mark token as used
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     `UPDATE magic_link_tokens SET used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
   )
     .bind(magicLink.id)
     .run();
 
   // Find or create user
-  let user = await c.env.DB.prepare(`SELECT id FROM users WHERE email = ?`)
+  let user = await c.get('db').prepare(`SELECT id FROM users WHERE email = ?`)
     .bind(email)
     .first<{ id: string }>();
 
   if (!user) {
     const userId = generateId();
-    await c.env.DB.prepare(`INSERT INTO users (id, email) VALUES (?, ?)`)
+    await c.get('db').prepare(`INSERT INTO users (id, email) VALUES (?, ?)`)
       .bind(userId, email)
       .run();
     user = { id: userId };
   }
 
   // Create session (30 day expiry)
-  const session = await createSession(c.env.DB, user.id);
+  const session = await createSession(c.get('db'), user.id);
 
   return c.json(session);
 });
@@ -118,7 +118,7 @@ authRoutes.post('/logout', requireAuth, async (c) => {
   const token = authHeader!.slice(7);
   const tokenHash = await hashToken(token);
 
-  await c.env.DB.prepare(`DELETE FROM sessions WHERE token_hash = ?`)
+  await c.get('db').prepare(`DELETE FROM sessions WHERE token_hash = ?`)
     .bind(tokenHash)
     .run();
 
@@ -154,7 +154,7 @@ authRoutes.post('/auto-login-tokens', requireAuth, async (c) => {
     ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
     : null;
 
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     'INSERT INTO auto_login_tokens (id, user_id, token_hash, label, expires_at) VALUES (?, ?, ?, ?, ?)'
   ).bind(id, user.id, tokenHash, label, expiresAt).run();
 
@@ -173,7 +173,7 @@ authRoutes.post('/auto-login-tokens', requireAuth, async (c) => {
 authRoutes.get('/auto-login-tokens', requireAuth, async (c) => {
   const user = c.get('user');
 
-  const tokens = await c.env.DB.prepare(
+  const tokens = await c.get('db').prepare(
     'SELECT id, label, expires_at, last_used_at, created_at FROM auto_login_tokens WHERE user_id = ? ORDER BY created_at DESC'
   ).bind(user.id).all();
 
@@ -185,7 +185,7 @@ authRoutes.delete('/auto-login-tokens/:id', requireAuth, async (c) => {
   const user = c.get('user');
   const tokenId = c.req.param('id');
 
-  const result = await c.env.DB.prepare(
+  const result = await c.get('db').prepare(
     'DELETE FROM auto_login_tokens WHERE id = ? AND user_id = ?'
   ).bind(tokenId, user.id).run();
 
@@ -206,7 +206,7 @@ authRoutes.get('/auto', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 })
 
   const tokenHash = await hashToken(token);
 
-  const record = await c.env.DB.prepare(
+  const record = await c.get('db').prepare(
     `SELECT alt.id, alt.user_id, alt.expires_at
      FROM auto_login_tokens alt
      WHERE alt.token_hash = ?
@@ -218,7 +218,7 @@ authRoutes.get('/auto', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 })
   }
 
   // Verify the user exists
-  const user = await c.env.DB.prepare(
+  const user = await c.get('db').prepare(
     'SELECT id FROM users WHERE id = ?'
   ).bind(record.user_id).first();
 
@@ -227,12 +227,12 @@ authRoutes.get('/auto', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 })
   }
 
   // Update last_used_at
-  await c.env.DB.prepare(
+  await c.get('db').prepare(
     'UPDATE auto_login_tokens SET last_used_at = datetime(\'now\') WHERE id = ?'
   ).bind(record.id).run();
 
   // Create session using the shared helper
-  const session = await createSession(c.env.DB, record.user_id as string);
+  const session = await createSession(c.get('db'), record.user_id as string);
 
   return c.json(session);
 });

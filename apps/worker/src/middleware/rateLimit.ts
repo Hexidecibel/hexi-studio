@@ -15,7 +15,10 @@ export function rateLimit(config: RateLimitConfig) {
   return createMiddleware<{ Bindings: Env }>(async (c, next) => {
     const key = config.keyFn
       ? config.keyFn(c)
-      : c.req.header('CF-Connecting-IP') || 'unknown';
+      : c.req.header('CF-Connecting-IP')
+        || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
+        || c.req.header('X-Real-IP')
+        || 'unknown';
 
     const now = Date.now();
     const windowKey = `${key}:${config.windowMs}`;
