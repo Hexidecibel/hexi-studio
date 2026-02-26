@@ -5,8 +5,13 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ENVIRONMENT = "development"
-CORS_ORIGIN = "http://localhost:5173"
-CDN_BASE_URL = "http://localhost:8787/api/v1/cdn"
+CORS_ORIGIN = "*"
+CDN_BASE_URL = "/api/v1/cdn"
+MAGIC_LINK_BASE_URL = "http://localhost:5174"
+SMTP_HOST = "smtp.example.com"
+SMTP_PORT = "587"
+SMTP_FROM = "Gallery <noreply@example.com>"
+SMTP_USER = "noreply@example.com"
 
 # D1 Database
 [[d1_databases]]
@@ -18,15 +23,6 @@ database_id = "placeholder-replace-with-real-id"
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"
 bucket_name = "hexi-media"
-
-# Rate limiting
-# [NOTE: Rate limiting will use a simple in-memory approach for now]
-
-# Email: SMTP via Titan Email
-SMTP_HOST = "smtp.example.com"
-SMTP_PORT = "587"
-SMTP_FROM = "Gallery <noreply@example.com>"
-SMTP_USER = "noreply@example.com"
 
 # SMTP password (set as a secret, not a var):
 #   npx wrangler secret put SMTP_PASS

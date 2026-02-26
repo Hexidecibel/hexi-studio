@@ -68,10 +68,11 @@ export function GalleryEditorPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <button onClick={() => navigate('/')} className="btn-text">&larr; Back</button>
+        <button onClick={() => navigate('/')} className="btn-secondary">&larr; Back</button>
         <h1>{gallery.name}</h1>
-        <Link to={`/galleries/${id}/settings`} className="btn-text">Settings</Link>
-        <Link to={`/galleries/${id}/embed`} className="btn-text">Embed</Link>
+        <Link to={`/galleries/${id}/settings`} className="btn-secondary">Settings</Link>
+        <Link to={`/galleries/${id}/embed`} className="btn-secondary">Embed</Link>
+        <Link to={`/galleries/${id}/preview`} className="btn-success">Preview</Link>
         <button onClick={handleSave} disabled={saving} className="btn-primary">
           {saving ? 'Saving...' : 'Save'}
         </button>

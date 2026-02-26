@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { rateLimit } from '../middleware/rateLimit';
+import { requireAuth } from '../middleware/auth';
 
 export const publicRoutes = new Hono<{ Bindings: Env }>();
 
@@ -68,6 +69,67 @@ function toPublicMediaItem(
 
   return item;
 }
+
+// Authenticated preview — works even when gallery is unpublished
+publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
+  const galleryId = c.req.param('id');
+  const user = c.get('user') as { id: string };
+
+  const gallery = await c.env.DB.prepare(
+    `SELECT id, user_id, name, slug, config
+     FROM galleries
+     WHERE id = ? AND user_id = ? AND deleted_at IS NULL
+     LIMIT 1`
+  )
+    .bind(galleryId, user.id)
+    .first<{ id: string; user_id: string; name: string; slug: string; config: string }>();
+
+  if (!gallery) {
+    return c.json({ error: 'Gallery not found' }, 404);
+  }
+
+  const cdnBase = c.env.CDN_BASE_URL || '';
+  const limit = 200;
+
+  const [mediaResult, countResult] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, media_type, width, height, alt, title, description, duration,
+              poster_r2_key, blur_data_url, sort_order
+       FROM media
+       WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL
+       ORDER BY sort_order ASC, created_at ASC
+       LIMIT ?`
+    )
+      .bind(gallery.id, gallery.user_id, limit)
+      .all(),
+    c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM media
+       WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL`
+    )
+      .bind(gallery.id, gallery.user_id)
+      .first<{ total: number }>(),
+  ]);
+
+  const total = countResult?.total ?? 0;
+  const items = (mediaResult.results || []).map((row) =>
+    toPublicMediaItem(row, cdnBase, gallery.user_id)
+  );
+
+  return c.json({
+    gallery: {
+      name: gallery.name,
+      slug: gallery.slug,
+      config: JSON.parse(gallery.config),
+    },
+    media: {
+      items,
+      total,
+      page: 1,
+      limit,
+      hasMore: total > limit,
+    },
+  });
+});
 
 // GET /public/galleries/:slug — Public gallery config + first page of media
 publicRoutes.get('/galleries/:slug', async (c) => {

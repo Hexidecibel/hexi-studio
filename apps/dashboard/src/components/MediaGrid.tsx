@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, type DragEvent, type ChangeEvent } from 'react';
+import { useState, useCallback, useRef, useEffect, type DragEvent, type ChangeEvent } from 'react';
 import { api, type MediaItem } from '../lib/api';
 
 interface MediaGridProps {
@@ -13,6 +13,73 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Drag-and-drop reorder state
+  const [localMedia, setLocalMedia] = useState<MediaItem[]>(media);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  // Keep local media in sync with prop when not dragging
+  useEffect(() => {
+    if (dragIndex === null) {
+      setLocalMedia(media);
+    }
+  }, [media, dragIndex]);
+
+  const handleReorderDragStart = useCallback((e: DragEvent, index: number) => {
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Set minimal drag data so the browser recognizes it as a drag
+    e.dataTransfer.setData('text/plain', String(index));
+  }, []);
+
+  const handleReorderDragOver = useCallback((e: DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragIndex !== null && index !== dragIndex) {
+      setOverIndex(index);
+    }
+  }, [dragIndex]);
+
+  const handleReorderDragLeave = useCallback(() => {
+    setOverIndex(null);
+  }, []);
+
+  const handleReorderDrop = useCallback((e: DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (dragIndex === null || dragIndex === dropIndex) {
+      setDragIndex(null);
+      setOverIndex(null);
+      return;
+    }
+
+    // Compute new order by moving the dragged item to the drop position
+    const reordered = [...localMedia];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+
+    // Optimistic update
+    setLocalMedia(reordered);
+    setDragIndex(null);
+    setOverIndex(null);
+
+    // Persist via API
+    const newOrder = reordered.map((item) => item.id);
+    api.media.reorder(galleryId, newOrder).then(() => {
+      onMediaChange();
+    }).catch((err) => {
+      console.error('Reorder failed:', err);
+      // Revert on failure
+      setLocalMedia(media);
+    });
+  }, [dragIndex, localMedia, galleryId, media, onMediaChange]);
+
+  const handleReorderDragEnd = useCallback(() => {
+    setDragIndex(null);
+    setOverIndex(null);
+  }, []);
 
   const uploadFile = useCallback(async (file: File) => {
     try {
@@ -156,10 +223,24 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
       )}
 
       {/* Media grid */}
-      {media.length > 0 ? (
+      {localMedia.length > 0 ? (
         <div className="media-grid">
-          {media.map((item) => (
-            <div key={item.id} className="media-item">
+          {localMedia.map((item, index) => (
+            <div
+              key={item.id}
+              className={
+                'media-item' +
+                (dragIndex === index ? ' media-item-dragging' : '') +
+                (overIndex === index && dragIndex !== null && dragIndex < index ? ' media-item-drop-after' : '') +
+                (overIndex === index && dragIndex !== null && dragIndex > index ? ' media-item-drop-before' : '')
+              }
+              draggable
+              onDragStart={(e) => handleReorderDragStart(e, index)}
+              onDragOver={(e) => handleReorderDragOver(e, index)}
+              onDragLeave={handleReorderDragLeave}
+              onDrop={(e) => handleReorderDrop(e, index)}
+              onDragEnd={handleReorderDragEnd}
+            >
               <div className="media-item-preview">
                 {item.media_type === 'video' ? (
                   <div className="video-placeholder">Video</div>

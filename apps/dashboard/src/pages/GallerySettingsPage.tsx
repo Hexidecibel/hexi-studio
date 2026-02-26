@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api, type Gallery } from '../lib/api';
 
 type LayoutType = 'grid' | 'masonry' | 'justified';
@@ -80,8 +80,9 @@ export function GallerySettingsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <button onClick={() => navigate(`/galleries/${id}`)} className="btn-text">&larr; Back to Editor</button>
+        <button onClick={() => navigate(`/galleries/${id}`)} className="btn-secondary">&larr; Back to Editor</button>
         <h1>Settings</h1>
+        <Link to={`/galleries/${id}/preview`} className="btn-success">Preview</Link>
         <button onClick={handleSave} disabled={saving} className="btn-primary">
           {saving ? 'Saving...' : 'Save Settings'}
         </button>

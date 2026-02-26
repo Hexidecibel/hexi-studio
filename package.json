@@ -13,7 +13,10 @@
     "test": "turbo run test",
     "test:run": "turbo run test:run",
     "lint": "turbo run lint",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "dev:start": "bin/dev-start",
+    "dev:stop": "bin/dev-stop",
+    "dev:restart": "bin/dev-restart"
   },
   "packageManager": "npm@10.9.4",
   "devDependencies": {

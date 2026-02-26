@@ -47,7 +47,7 @@ function MyGallery() {
   return (
     <div className="page">
       <div className="page-header">
-        <button onClick={() => navigate(`/galleries/${id}`)} className="btn-text">&larr; Back to Editor</button>
+        <button onClick={() => navigate(`/galleries/${id}`)} className="btn-secondary">&larr; Back to Editor</button>
         <h1>Embed Gallery</h1>
       </div>
 

@@ -6,6 +6,7 @@ import { GalleryListPage } from './pages/GalleryListPage';
 import { GalleryEditorPage } from './pages/GalleryEditorPage';
 import { GallerySettingsPage } from './pages/GallerySettingsPage';
 import { EmbedPage } from './pages/EmbedPage';
+import { PreviewPage } from './pages/PreviewPage';
 import { Layout } from './components/Layout';
 
 export function App() {
@@ -28,6 +29,7 @@ export function App() {
         <Route path="/galleries/:id" element={<GalleryEditorPage />} />
         <Route path="/galleries/:id/settings" element={<GallerySettingsPage />} />
         <Route path="/galleries/:id/embed" element={<EmbedPage />} />
+        <Route path="/galleries/:id/preview" element={<PreviewPage />} />
       </Route>
     </Routes>
   );

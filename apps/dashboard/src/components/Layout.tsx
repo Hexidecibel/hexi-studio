@@ -18,7 +18,7 @@ export function Layout() {
         </nav>
         <div className="header-right">
           <span className="user-email">{user?.email}</span>
-          <button onClick={logout} className="btn-text">Sign Out</button>
+          <button onClick={logout} className="btn-secondary btn-sm">Sign Out</button>
         </div>
       </header>
       <main className="dashboard-main">

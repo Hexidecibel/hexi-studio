@@ -71,6 +71,11 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ message: string }>(`/galleries/${id}`, { method: 'DELETE' }),
+    preview: (id: string) =>
+      request<{
+        gallery: { name: string; slug: string; config: Record<string, unknown> };
+        media: { items: Array<{ id: string; src: string; alt: string; type: string; width?: number; height?: number; thumbnail?: string; srcSet?: string; blurDataUrl?: string; title?: string; description?: string; poster?: string; duration?: number }>; total: number; hasMore: boolean };
+      }>(`/public/preview/galleries/${id}`),
   },
 
   media: {

@@ -25,3 +25,7 @@ npm-debug.log*
 # Cloudflare
 .wrangler
 .dev.vars
+
+# Dev environment
+.dev-logs
+.dev-pids
