@@ -131,6 +131,44 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
   });
 });
 
+// Public single media info (for library items)
+publicRoutes.get('/media/:id', async (c) => {
+  const id = c.req.param('id');
+
+  const item = await c.env.DB.prepare(
+    "SELECT id, user_id, width, height, alt, title, description, media_type, content_type FROM library_media WHERE id = ? AND status = 'ready' AND deleted_at IS NULL"
+  ).bind(id).first();
+
+  if (!item) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+
+  const userId = item.user_id as string;
+  const mediaId = item.id as string;
+
+  const src = `/api/v1/cdn/${userId}/${mediaId}/original`;
+  const thumbnail = item.media_type === 'image'
+    ? `/api/v1/cdn/${userId}/${mediaId}/w_400,q_75,f_auto`
+    : undefined;
+
+  const srcSet = item.media_type === 'image'
+    ? [400, 800, 1200, 1600].map(w => `/api/v1/cdn/${userId}/${mediaId}/w_${w},q_75,f_auto ${w}w`).join(', ')
+    : undefined;
+
+  return c.json({
+    id: mediaId,
+    src,
+    alt: item.alt || '',
+    width: item.width,
+    height: item.height,
+    thumbnail,
+    srcSet,
+    title: item.title,
+    description: item.description,
+    type: item.media_type,
+  });
+});
+
 // GET /public/galleries/:slug — Public gallery config + first page of media
 publicRoutes.get('/galleries/:slug', async (c) => {
   const slug = c.req.param('slug');

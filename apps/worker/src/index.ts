@@ -4,6 +4,7 @@ import { logger } from 'hono/logger';
 import type { Env } from './types';
 import { authRoutes } from './routes/auth';
 import { galleryRoutes } from './routes/galleries';
+import { libraryRoutes } from './routes/library';
 import { mediaRoutes } from './routes/media';
 import { publicRoutes } from './routes/public';
 import { cdnRoutes } from './routes/cdn';
@@ -30,6 +31,7 @@ app.use('/api/v1/cdn/*', cors({ origin: '*' }));
 // Mount routes
 app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/galleries', galleryRoutes);
+app.route('/api/v1/library', libraryRoutes);
 app.route('/api/v1/cdn', cdnRoutes);
 app.route('/api/v1/public', publicRoutes);
 

@@ -50,6 +50,24 @@ export const api = {
       ),
     me: () => request<{ id: string; email: string; name: string | null; plan: string; storageUsedBytes: number; storageLimitBytes: number }>('/auth/me'),
     logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
+    autoLogin: (token: string) =>
+      request<{ token: string; expiresAt: string }>(
+        `/auth/auto?token=${encodeURIComponent(token)}`
+      ),
+    createAutoLoginToken: (label: string, expiresInDays = 365) =>
+      request<{ data: { id: string; label: string; token: string; expiresAt: string | null; createdAt: string } }>(
+        '/auth/auto-login-tokens',
+        { method: 'POST', body: JSON.stringify({ label, expiresInDays }) }
+      ),
+    listAutoLoginTokens: () =>
+      request<{ data: Array<{ id: string; label: string; expires_at: string | null; last_used_at: string | null; created_at: string }> }>(
+        '/auth/auto-login-tokens'
+      ),
+    revokeAutoLoginToken: (id: string) =>
+      request<{ message: string }>(
+        `/auth/auto-login-tokens/${id}`,
+        { method: 'DELETE' }
+      ),
   },
 
   galleries: {
@@ -132,6 +150,53 @@ export const api = {
         body: JSON.stringify({ order }),
       }),
   },
+
+  library: {
+    list: (page = 1, limit = 50, tag?: string) => {
+      let url = `/library?page=${page}&limit=${limit}`;
+      if (tag) url += `&tag=${encodeURIComponent(tag)}`;
+      return request<{
+        data: LibraryItem[];
+        pagination: { page: number; limit: number; total: number; hasMore: boolean };
+      }>(url);
+    },
+    get: (id: string) =>
+      request<{ data: LibraryItem }>(`/library/${id}`),
+    getUploadUrl: (file: { filename: string; contentType: string; fileSize: number }) =>
+      request<{ data: { mediaId: string; r2Key: string; contentType: string; maxSize: number } }>(
+        '/library/upload',
+        { method: 'POST', body: JSON.stringify(file) }
+      ),
+    upload: (mediaId: string, file: File) => {
+      const token = localStorage.getItem('hexi_session_token');
+      return fetch(`/api/v1/library/${mediaId}/upload`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: file,
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: 'Upload failed' }));
+          throw new Error(body.error || 'Upload failed');
+        }
+        return res.json();
+      });
+    },
+    confirm: (data: { mediaId: string; width?: number; height?: number; alt?: string; title?: string; tags?: string[] }) =>
+      request<{ data: LibraryItem }>('/library/confirm', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { alt?: string; title?: string; description?: string; tags?: string[] }) =>
+      request<{ data: LibraryItem }>(`/library/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ message: string }>(`/library/${id}`, { method: 'DELETE' }),
+  },
 };
 
 export interface Gallery {
@@ -162,6 +227,28 @@ export interface MediaItem {
   duration: number | null;
   poster_r2_key: string | null;
   sort_order: number;
+  status: string;
+  blur_data_url: string | null;
+  metadata: string;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LibraryItem {
+  id: string;
+  user_id: string;
+  filename: string;
+  content_type: string;
+  file_size: number;
+  r2_key: string;
+  media_type: string;
+  width: number | null;
+  height: number | null;
+  alt: string;
+  title: string | null;
+  description: string | null;
+  tags: string;
   status: string;
   blur_data_url: string | null;
   metadata: string;

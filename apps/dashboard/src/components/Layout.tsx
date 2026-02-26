@@ -15,6 +15,12 @@ export function Layout() {
           <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
             Galleries
           </Link>
+          <Link to="/library" className={location.pathname === '/library' ? 'active' : ''}>
+            Library
+          </Link>
+          <Link to="/account" className={location.pathname === '/account' ? 'active' : ''}>
+            Account
+          </Link>
         </nav>
         <div className="header-right">
           <span className="user-email">{user?.email}</span>

@@ -59,12 +59,20 @@ cdnRoutes.get('/:tenantId/:mediaId/:variant', async (c) => {
     return c.json({ error: 'Invalid CDN path' }, 400);
   }
 
-  // Look up the media record to find the R2 key
-  const media = await c.env.DB.prepare(
+  // Look up the media record to find the R2 key (check both media and library_media tables)
+  let media = await c.env.DB.prepare(
     'SELECT r2_key, content_type FROM media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   )
     .bind(mediaId, tenantId)
     .first<{ r2_key: string; content_type: string }>();
+
+  if (!media) {
+    media = await c.env.DB.prepare(
+      'SELECT r2_key, content_type FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
+    )
+      .bind(mediaId, tenantId)
+      .first<{ r2_key: string; content_type: string }>();
+  }
 
   if (!media) {
     return c.json({ error: 'Not found' }, 404);
@@ -114,11 +122,19 @@ cdnRoutes.get('/:tenantId/:mediaId', async (c) => {
   const tenantId = c.req.param('tenantId');
   const mediaId = c.req.param('mediaId');
 
-  const media = await c.env.DB.prepare(
+  let media = await c.env.DB.prepare(
     'SELECT r2_key, content_type FROM media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
   )
     .bind(mediaId, tenantId)
     .first<{ r2_key: string; content_type: string }>();
+
+  if (!media) {
+    media = await c.env.DB.prepare(
+      'SELECT r2_key, content_type FROM library_media WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
+    )
+      .bind(mediaId, tenantId)
+      .first<{ r2_key: string; content_type: string }>();
+  }
 
   if (!media) {
     return c.json({ error: 'Not found' }, 404);

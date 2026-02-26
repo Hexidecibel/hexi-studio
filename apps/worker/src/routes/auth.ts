@@ -1,10 +1,24 @@
 import { Hono } from 'hono';
+import type { D1Database } from '@cloudflare/workers-types';
 import type { Env, AuthVariables } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { generateToken, hashToken, generateId } from '../utils/crypto';
 import { isValidEmail } from '../utils/validation';
 import { sendEmail, buildMagicLinkEmail } from '../services/email';
+
+async function createSession(db: D1Database, userId: string): Promise<{ token: string; expiresAt: string }> {
+  const sessionToken = generateToken();
+  const sessionHash = await hashToken(sessionToken);
+  const sessionId = generateId();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  await db.prepare(
+    'INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)'
+  ).bind(sessionId, userId, sessionHash, expiresAt).run();
+
+  return { token: sessionToken, expiresAt };
+}
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
@@ -93,21 +107,9 @@ authRoutes.get('/verify', async (c) => {
   }
 
   // Create session (30 day expiry)
-  const sessionToken = generateToken();
-  const sessionTokenHash = await hashToken(sessionToken);
-  const sessionId = generateId();
-  const sessionExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const session = await createSession(c.env.DB, user.id);
 
-  await c.env.DB.prepare(
-    `INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)`
-  )
-    .bind(sessionId, user.id, sessionTokenHash, sessionExpiry)
-    .run();
-
-  return c.json({
-    token: sessionToken,
-    expiresAt: sessionExpiry,
-  });
+  return c.json(session);
 });
 
 // POST /auth/logout — End session (requires auth)
@@ -134,4 +136,103 @@ authRoutes.get('/me', requireAuth, async (c) => {
     storageUsedBytes: user.storageUsedBytes,
     storageLimitBytes: user.storageLimitBytes,
   });
+});
+
+// POST /auth/auto-login-tokens — Generate a new auto-login token (requires auth)
+authRoutes.post('/auto-login-tokens', requireAuth, async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json<{ label?: string; expiresInDays?: number }>();
+
+  const label = body.label || '';
+  const expiresInDays = body.expiresInDays ?? 365; // default 1 year
+
+  const token = generateToken();
+  const tokenHash = await hashToken(token);
+  const id = generateId();
+
+  const expiresAt = expiresInDays > 0
+    ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+    : null;
+
+  await c.env.DB.prepare(
+    'INSERT INTO auto_login_tokens (id, user_id, token_hash, label, expires_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind(id, user.id, tokenHash, label, expiresAt).run();
+
+  return c.json({
+    data: {
+      id,
+      label,
+      token, // plaintext - only returned once
+      expiresAt,
+      createdAt: new Date().toISOString(),
+    }
+  }, 201);
+});
+
+// GET /auth/auto-login-tokens — List tokens (requires auth)
+authRoutes.get('/auto-login-tokens', requireAuth, async (c) => {
+  const user = c.get('user');
+
+  const tokens = await c.env.DB.prepare(
+    'SELECT id, label, expires_at, last_used_at, created_at FROM auto_login_tokens WHERE user_id = ? ORDER BY created_at DESC'
+  ).bind(user.id).all();
+
+  return c.json({ data: tokens.results });
+});
+
+// DELETE /auth/auto-login-tokens/:id — Revoke a token (requires auth)
+authRoutes.delete('/auto-login-tokens/:id', requireAuth, async (c) => {
+  const user = c.get('user');
+  const tokenId = c.req.param('id');
+
+  const result = await c.env.DB.prepare(
+    'DELETE FROM auto_login_tokens WHERE id = ? AND user_id = ?'
+  ).bind(tokenId, user.id).run();
+
+  if (result.meta.changes === 0) {
+    return c.json({ error: 'Token not found' }, 404);
+  }
+
+  return c.json({ message: 'Token revoked' });
+});
+
+// GET /auth/auto — Validate auto-login token and create session (public, rate limited)
+authRoutes.get('/auto', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 }), async (c) => {
+  const token = c.req.query('token');
+
+  if (!token) {
+    return c.json({ error: 'Missing token' }, 400);
+  }
+
+  const tokenHash = await hashToken(token);
+
+  const record = await c.env.DB.prepare(
+    `SELECT alt.id, alt.user_id, alt.expires_at
+     FROM auto_login_tokens alt
+     WHERE alt.token_hash = ?
+       AND (alt.expires_at IS NULL OR alt.expires_at > datetime('now'))`
+  ).bind(tokenHash).first();
+
+  if (!record) {
+    return c.json({ error: 'Invalid or expired token' }, 401);
+  }
+
+  // Verify the user exists
+  const user = await c.env.DB.prepare(
+    'SELECT id FROM users WHERE id = ?'
+  ).bind(record.user_id).first();
+
+  if (!user) {
+    return c.json({ error: 'User not found' }, 401);
+  }
+
+  // Update last_used_at
+  await c.env.DB.prepare(
+    'UPDATE auto_login_tokens SET last_used_at = datetime(\'now\') WHERE id = ?'
+  ).bind(record.id).run();
+
+  // Create session using the shared helper
+  const session = await createSession(c.env.DB, record.user_id as string);
+
+  return c.json(session);
 });
