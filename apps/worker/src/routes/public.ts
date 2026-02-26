@@ -1,0 +1,195 @@
+import { Hono } from 'hono';
+import type { Env } from '../types';
+import { rateLimit } from '../middleware/rateLimit';
+
+export const publicRoutes = new Hono<{ Bindings: Env }>();
+
+// Rate limit public reads: 200 per minute
+publicRoutes.use('*', rateLimit({ windowMs: 60 * 1000, maxRequests: 200 }));
+
+interface PublicMediaItem {
+  id: string;
+  src: string;
+  alt: string;
+  type: 'image' | 'video';
+  width?: number;
+  height?: number;
+  thumbnail?: string;
+  srcSet?: string;
+  blurDataUrl?: string;
+  title?: string;
+  description?: string;
+  poster?: string;
+  duration?: number;
+}
+
+/**
+ * Transform a DB media row into a public MediaItem matching @hexi/gallery's MediaItem type
+ */
+function toPublicMediaItem(
+  row: Record<string, unknown>,
+  cdnBase: string,
+  userId: string
+): PublicMediaItem {
+  const mediaId = row.id as string;
+  const mediaType = row.media_type as 'image' | 'video';
+  const base = `${cdnBase}/${userId}/${mediaId}`;
+
+  const item: PublicMediaItem = {
+    id: mediaId,
+    src: `${base}/original`,
+    alt: (row.alt as string) || '',
+    type: mediaType,
+  };
+
+  if (row.width) item.width = row.width as number;
+  if (row.height) item.height = row.height as number;
+  if (row.title) item.title = row.title as string;
+  if (row.description) item.description = row.description as string;
+  if (row.blur_data_url) item.blurDataUrl = row.blur_data_url as string;
+
+  if (mediaType === 'image') {
+    // Thumbnail
+    item.thumbnail = `${base}/w_400,q_75,f_auto`;
+
+    // Responsive srcSet
+    item.srcSet = [400, 800, 1200, 1600]
+      .map((w) => `${base}/w_${w},q_80,f_auto ${w}w`)
+      .join(', ');
+  }
+
+  if (mediaType === 'video') {
+    if (row.duration) item.duration = row.duration as number;
+    if (row.poster_r2_key) {
+      // Poster uses the same CDN pattern
+      item.poster = `${base}/original`; // poster would need its own key mapping in production
+    }
+  }
+
+  return item;
+}
+
+// GET /public/galleries/:slug — Public gallery config + first page of media
+publicRoutes.get('/galleries/:slug', async (c) => {
+  const slug = c.req.param('slug');
+
+  if (!slug) {
+    return c.json({ error: 'Gallery slug is required' }, 400);
+  }
+
+  // Find published gallery by slug (across all users)
+  const gallery = await c.env.DB.prepare(
+    `SELECT g.id, g.user_id, g.name, g.slug, g.config
+     FROM galleries g
+     WHERE g.slug = ? AND g.published = 1 AND g.deleted_at IS NULL
+     LIMIT 1`
+  )
+    .bind(slug)
+    .first<{ id: string; user_id: string; name: string; slug: string; config: string }>();
+
+  if (!gallery) {
+    return c.json({ error: 'Gallery not found' }, 404);
+  }
+
+  const cdnBase = c.env.CDN_BASE_URL || '';
+  const limit = 50;
+
+  // Fetch first page of media
+  const [mediaResult, countResult] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, media_type, width, height, alt, title, description, duration,
+              poster_r2_key, blur_data_url, sort_order
+       FROM media
+       WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL
+       ORDER BY sort_order ASC, created_at ASC
+       LIMIT ?`
+    )
+      .bind(gallery.id, gallery.user_id, limit)
+      .all(),
+    c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM media
+       WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL`
+    )
+      .bind(gallery.id, gallery.user_id)
+      .first<{ total: number }>(),
+  ]);
+
+  const total = countResult?.total ?? 0;
+  const items = (mediaResult.results || []).map((row) =>
+    toPublicMediaItem(row, cdnBase, gallery.user_id)
+  );
+
+  return c.json({
+    gallery: {
+      name: gallery.name,
+      slug: gallery.slug,
+      config: JSON.parse(gallery.config),
+    },
+    media: {
+      items,
+      total,
+      page: 1,
+      limit,
+      hasMore: total > limit,
+    },
+  });
+});
+
+// GET /public/galleries/:slug/media — Public media pagination
+publicRoutes.get('/galleries/:slug/media', async (c) => {
+  const slug = c.req.param('slug');
+
+  if (!slug) {
+    return c.json({ error: 'Gallery slug is required' }, 400);
+  }
+
+  const gallery = await c.env.DB.prepare(
+    `SELECT id, user_id FROM galleries
+     WHERE slug = ? AND published = 1 AND deleted_at IS NULL
+     LIMIT 1`
+  )
+    .bind(slug)
+    .first<{ id: string; user_id: string }>();
+
+  if (!gallery) {
+    return c.json({ error: 'Gallery not found' }, 404);
+  }
+
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '50')));
+  const offset = (page - 1) * limit;
+
+  const cdnBase = c.env.CDN_BASE_URL || '';
+
+  const [mediaResult, countResult] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, media_type, width, height, alt, title, description, duration,
+              poster_r2_key, blur_data_url, sort_order
+       FROM media
+       WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL
+       ORDER BY sort_order ASC, created_at ASC
+       LIMIT ? OFFSET ?`
+    )
+      .bind(gallery.id, gallery.user_id, limit, offset)
+      .all(),
+    c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM media
+       WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL`
+    )
+      .bind(gallery.id, gallery.user_id)
+      .first<{ total: number }>(),
+  ]);
+
+  const total = countResult?.total ?? 0;
+  const items = (mediaResult.results || []).map((row) =>
+    toPublicMediaItem(row, cdnBase, gallery.user_id)
+  );
+
+  return c.json({
+    items,
+    total,
+    page,
+    limit,
+    hasMore: offset + limit < total,
+  });
+});

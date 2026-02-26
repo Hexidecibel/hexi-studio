@@ -27,10 +27,10 @@ jobs:
       - name: Test
         run: npm run test:run
 
-      - name: Build
-        run: npm run build:lib
+      - name: Build gallery library
+        run: npm run build:lib --workspace=@hexi/gallery
 
-      - name: Publish
-        run: npm publish --provenance --access public
+      - name: Publish gallery
+        run: npm publish --provenance --access public --workspace=@hexi/gallery
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

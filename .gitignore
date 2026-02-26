@@ -18,3 +18,10 @@ npm-debug.log*
 
 # OS
 .DS_Store
+
+# Turborepo
+.turbo
+
+# Cloudflare
+.wrangler
+.dev.vars

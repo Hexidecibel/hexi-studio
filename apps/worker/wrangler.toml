@@ -1,0 +1,32 @@
+name = "hexi-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+CORS_ORIGIN = "http://localhost:5173"
+CDN_BASE_URL = "http://localhost:8787/api/v1/cdn"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "hexi-db"
+database_id = "placeholder-replace-with-real-id"
+
+# R2 Bucket
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "hexi-media"
+
+# Rate limiting
+# [NOTE: Rate limiting will use a simple in-memory approach for now]
+
+# Email: SMTP via Titan Email
+SMTP_HOST = "smtp.example.com"
+SMTP_PORT = "587"
+SMTP_FROM = "Gallery <noreply@example.com>"
+SMTP_USER = "noreply@example.com"
+
+# SMTP password (set as a secret, not a var):
+#   npx wrangler secret put SMTP_PASS

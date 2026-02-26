@@ -36,10 +36,12 @@ export { useContainerWidth } from './hooks/useContainerWidth';
 export { usePinchZoom } from './hooks/usePinchZoom';
 export { useSourceAdapter } from './hooks/useSourceAdapter';
 export { useAsyncAdapter } from './hooks/useAsyncAdapter';
+export { useHexiCloud } from './hooks/useHexiCloud';
+export type { HexiCloudOptions, HexiCloudResult } from './hooks/useHexiCloud';
 
 // Adapters
-export { urlAdapter, s3Adapter, asyncAdapter } from './adapters';
-export type { UrlAdapterConfig, S3AdapterConfig, FetchPage, AsyncAdapterConfig } from './adapters';
+export { urlAdapter, s3Adapter, asyncAdapter, hexiCloudAdapter } from './adapters';
+export type { UrlAdapterConfig, S3AdapterConfig, FetchPage, AsyncAdapterConfig, HexiCloudConfig } from './adapters';
 
 // Configurator
 export { ConfiguratorPanel } from './components/Configurator';
