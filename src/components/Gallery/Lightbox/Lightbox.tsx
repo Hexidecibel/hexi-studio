@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ImageItem } from '../../../types';
+import { isVideoItem } from '../../../types';
 import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { useSwipe } from '../../../hooks/useSwipe';
 import { LightboxImage } from './LightboxImage';
@@ -17,6 +18,12 @@ export interface LightboxProps {
   onClose: () => void;
   onNext: () => void;
   onPrev: () => void;
+  renderLightboxFooter?: (image: ImageItem, index: number) => React.ReactNode;
+  enableDownload?: boolean;
+  enableSlideshow?: boolean;
+  isPlaying?: boolean;
+  onToggleSlideshow?: () => void;
+  onPauseSlideshow?: () => void;
 }
 
 export function Lightbox({
@@ -29,13 +36,36 @@ export function Lightbox({
   onClose,
   onNext,
   onPrev,
+  renderLightboxFooter,
+  enableDownload,
+  enableSlideshow,
+  isPlaying,
+  onToggleSlideshow,
+  onPauseSlideshow,
 }: LightboxProps) {
   const [isZoomed, setIsZoomed] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const handleZoomChange = useCallback((zoomed: boolean) => {
+    setIsZoomed(zoomed);
+    if (zoomed) {
+      onPauseSlideshow?.();
+    }
+  }, [onPauseSlideshow]);
   const containerRef = useFocusTrap(isOpen);
   const swipeHandlers = useSwipe({
     onSwipeLeft: isZoomed ? undefined : onNext,
     onSwipeRight: isZoomed ? undefined : onPrev,
   });
+
+  useEffect(() => {
+    setIsVideoPlaying(false);
+  }, [currentIndex]);
+
+  useEffect(() => {
+    if (isVideoPlaying) {
+      onPauseSlideshow?.();
+    }
+  }, [isVideoPlaying, onPauseSlideshow]);
 
   const handleBackdropClick = useCallback(() => {
     onClose();
@@ -56,7 +86,7 @@ export function Lightbox({
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
-      aria-label="Image lightbox"
+      aria-label={isVideoItem(currentImage) ? 'Video lightbox' : 'Image lightbox'}
       onClick={handleBackdropClick}
       {...swipeHandlers}
     >
@@ -69,10 +99,20 @@ export function Lightbox({
         onClose={onClose}
         onNext={onNext}
         onPrev={onPrev}
+        renderLightboxFooter={renderLightboxFooter}
+        enableDownload={enableDownload}
+        enableSlideshow={enableSlideshow}
+        isPlaying={isPlaying}
+        onToggleSlideshow={onToggleSlideshow}
       />
 
       <div className={styles.imageContainer} onClick={handleContentClick}>
-        <LightboxImage key={currentImage.id} image={currentImage} onZoomChange={setIsZoomed} />
+        <LightboxImage
+          key={currentImage.id}
+          image={currentImage}
+          onZoomChange={handleZoomChange}
+          onVideoPlayStateChange={setIsVideoPlaying}
+        />
       </div>
     </div>,
     document.body,

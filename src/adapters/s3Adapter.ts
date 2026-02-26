@@ -1,4 +1,4 @@
-import type { ImageItem, SourceAdapter } from '../types';
+import type { MediaItem, SourceAdapter } from '../types';
 
 export interface S3AdapterConfig {
   bucket: string;
@@ -8,7 +8,9 @@ export interface S3AdapterConfig {
   fetchFn?: typeof fetch;
 }
 
-const DEFAULT_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg'];
+const DEFAULT_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.mp4', '.webm', '.ogg', '.mov'];
+
+const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg', '.mov'];
 
 function buildBucketUrl(bucket: string, region: string, prefix?: string): string {
   let url = `https://${bucket}.s3.${region}.amazonaws.com/?list-type=2`;
@@ -28,7 +30,7 @@ function parseS3Xml(xml: string): string[] {
   return keys;
 }
 
-function isImageFile(key: string, extensions: string[]): boolean {
+function isMediaFile(key: string, extensions: string[]): boolean {
   const lower = key.toLowerCase();
   return extensions.some((ext) => lower.endsWith(ext));
 }
@@ -54,14 +56,17 @@ export const s3Adapter: SourceAdapter<S3AdapterConfig> = {
 
     const xml = await response.text();
     const keys = parseS3Xml(xml);
-    const imageKeys = keys.filter((key) => isImageFile(key, extensions));
+    const mediaKeys = keys.filter((key) => isMediaFile(key, extensions));
 
-    return imageKeys.map((key, index): ImageItem => {
+    return mediaKeys.map((key, index): MediaItem => {
       const filename = key.split('/').pop() || key;
+      const lower = key.toLowerCase();
+      const isVideo = VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
       return {
         id: `s3-${index}`,
         src: `https://${bucket}.s3.${region}.amazonaws.com/${key}`,
         alt: filename,
+        ...(isVideo && { type: 'video' as const }),
       };
     });
   },

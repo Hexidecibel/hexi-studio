@@ -16,7 +16,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.closeButton {
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerButton {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -30,11 +36,11 @@
   transition: background var(--hexi-transition-fast, 150ms ease);
 }
 
-.closeButton:hover {
+.headerButton:hover {
   background: var(--hexi-lightbox-button-hover, rgba(255, 255, 255, 0.2));
 }
 
-.closeButton:focus-visible {
+.headerButton:focus-visible {
   outline: none;
   box-shadow: var(--hexi-focus-ring, 0 0 0 3px rgba(66, 153, 225, 0.5));
 }

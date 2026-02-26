@@ -145,4 +145,43 @@ describe('Lightbox', () => {
 
     expect(screen.getByRole('img')).toHaveAttribute('src', '/img2.jpg');
   });
+
+  it('renders video element for video items', () => {
+    const videoImages: ImageItem[] = [
+      {
+        id: 'v1',
+        src: '/video1.mp4',
+        alt: 'Video 1',
+        type: 'video',
+        poster: '/poster1.jpg',
+        title: 'Test Video',
+      },
+      ...images.slice(1),
+    ];
+
+    render(
+      <Lightbox
+        {...defaultProps}
+        images={videoImages}
+      />,
+    );
+
+    // Should render a video element, not an img
+    const video = document.querySelector('video');
+    expect(video).toBeInTheDocument();
+    expect(video).toHaveAttribute('poster', '/poster1.jpg');
+    expect(video).toHaveAttribute('controls');
+    expect(video!.muted).toBe(true);
+  });
+
+  it('renders img element for image items (regression)', () => {
+    render(<Lightbox {...defaultProps} />);
+
+    const img = screen.getByRole('img');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', '/img1.jpg');
+
+    // Should NOT have a video element
+    expect(document.querySelector('video')).not.toBeInTheDocument();
+  });
 });

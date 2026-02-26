@@ -137,4 +137,22 @@ describe('useLightbox', () => {
     act(() => result.current.close());
     expect(document.body.style.overflow).toBe('');
   });
+
+  it('preloads poster for video items instead of src', () => {
+    const mixedItems: ImageItem[] = [
+      { id: '1', src: '/1.jpg', alt: 'Image' },
+      { id: 'v1', src: '/video.mp4', alt: 'Video', type: 'video', poster: '/poster.jpg' },
+      { id: '3', src: '/3.jpg', alt: 'Image 3' },
+    ];
+
+    const { result } = renderHook(() => useLightbox({ images: mixedItems }));
+
+    act(() => result.current.open(0));
+
+    // The preload effect runs for adjacent items.
+    // We can't directly inspect preloaded images, but we verify
+    // the hook doesn't crash with video items
+    expect(result.current.currentIndex).toBe(0);
+    expect(result.current.isOpen).toBe(true);
+  });
 });

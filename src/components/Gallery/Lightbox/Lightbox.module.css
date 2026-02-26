@@ -74,6 +74,22 @@
   height: 48px;
 }
 
+.videoContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.video {
+  max-width: 100%;
+  max-height: 100%;
+  outline: none;
+  transition: opacity var(--hexi-transition-normal, 250ms ease);
+}
+
 @media (max-width: 640px) {
   .imageContainer {
     padding: 50px 16px 90px;

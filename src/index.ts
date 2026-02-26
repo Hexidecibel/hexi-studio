@@ -6,6 +6,8 @@
 
 // Types
 export type {
+  MediaItem,
+  VideoSource,
   ImageItem,
   LayoutType,
   LayoutOptions,
@@ -16,7 +18,7 @@ export type {
   PaginatedResult,
 } from './types';
 
-export { DEFAULT_LAYOUT } from './types';
+export { DEFAULT_LAYOUT, isVideoItem } from './types';
 
 // Styles (consumers import separately: import '@hexi/gallery/styles')
 import './styles/theme.css';

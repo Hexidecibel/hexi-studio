@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type {
   ImageItem,
+  MediaItem,
+  VideoSource,
   LayoutType,
   LayoutOptions,
   GalleryProps,
   SourceAdapter,
 } from '../types';
-import { DEFAULT_LAYOUT } from '../types';
+import { DEFAULT_LAYOUT, isVideoItem } from '../types';
 
 describe('Types', () => {
   describe('ImageItem', () => {
@@ -40,6 +42,81 @@ describe('Types', () => {
       expect(image.width).toBe(1920);
       expect(image.height).toBe(1080);
       expect(image.metadata?.photographer).toBe('John Doe');
+    });
+  });
+
+  describe('MediaItem', () => {
+    it('should accept video-specific fields', () => {
+      const video: MediaItem = {
+        id: 'v1',
+        src: 'https://example.com/video.mp4',
+        alt: 'Test video',
+        type: 'video',
+        poster: 'https://example.com/poster.jpg',
+        sources: [
+          { src: 'https://example.com/video.mp4', type: 'video/mp4' },
+          { src: 'https://example.com/video.webm', type: 'video/webm' },
+        ],
+        duration: 120,
+      };
+
+      expect(video.type).toBe('video');
+      expect(video.poster).toBe('https://example.com/poster.jpg');
+      expect(video.sources).toHaveLength(2);
+      expect(video.duration).toBe(120);
+    });
+
+    it('should default to image type when type is omitted', () => {
+      const image: MediaItem = {
+        id: '1',
+        src: 'https://example.com/image.jpg',
+        alt: 'Test image',
+      };
+
+      expect(image.type).toBeUndefined();
+    });
+  });
+
+  describe('VideoSource', () => {
+    it('should define video source interface', () => {
+      const source: VideoSource = {
+        src: 'https://example.com/video.mp4',
+        type: 'video/mp4',
+      };
+
+      expect(source.src).toBe('https://example.com/video.mp4');
+      expect(source.type).toBe('video/mp4');
+    });
+  });
+
+  describe('isVideoItem', () => {
+    it('should return true for video items', () => {
+      const video: MediaItem = {
+        id: 'v1',
+        src: 'https://example.com/video.mp4',
+        alt: 'Video',
+        type: 'video',
+      };
+      expect(isVideoItem(video)).toBe(true);
+    });
+
+    it('should return false for image items', () => {
+      const image: MediaItem = {
+        id: '1',
+        src: 'https://example.com/image.jpg',
+        alt: 'Image',
+        type: 'image',
+      };
+      expect(isVideoItem(image)).toBe(false);
+    });
+
+    it('should return false when type is omitted', () => {
+      const image: MediaItem = {
+        id: '1',
+        src: 'https://example.com/image.jpg',
+        alt: 'Image',
+      };
+      expect(isVideoItem(image)).toBe(false);
     });
   });
 

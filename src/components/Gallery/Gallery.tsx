@@ -17,9 +17,14 @@ export function Gallery({
   loading,
   virtualize,
   onImageLoad,
+  renderEmpty,
+  renderLightboxFooter,
+  enableDownload,
+  enableSlideshow,
+  slideshowInterval,
 }: GalleryProps) {
   const resolvedLayout = { ...DEFAULT_LAYOUT, ...layout };
-  const lightbox = useLightbox({ images });
+  const lightbox = useLightbox({ images, slideshowInterval });
 
   const handleImageClick = useCallback(
     (image: ImageItem, index: number) => {
@@ -32,6 +37,14 @@ export function Gallery({
   );
 
   const containerClassName = [styles.gallery, className].filter(Boolean).join(' ');
+
+  if (images.length === 0) {
+    return (
+      <div className={containerClassName}>
+        {renderEmpty?.()}
+      </div>
+    );
+  }
 
   const layoutProps = {
     images,
@@ -63,6 +76,12 @@ export function Gallery({
           onClose={lightbox.close}
           onNext={lightbox.next}
           onPrev={lightbox.prev}
+          renderLightboxFooter={renderLightboxFooter}
+          enableDownload={enableDownload}
+          enableSlideshow={enableSlideshow}
+          isPlaying={lightbox.isPlaying}
+          onToggleSlideshow={lightbox.toggleSlideshow}
+          onPauseSlideshow={lightbox.pauseSlideshow}
         />
       )}
     </div>

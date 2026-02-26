@@ -1,18 +1,21 @@
-import type { ImageItem } from '../types';
+import type { MediaItem } from '../types';
 
-export function createImagesFromFiles(files: FileList): ImageItem[] {
-  const images: ImageItem[] = [];
+export function createImagesFromFiles(files: FileList): MediaItem[] {
+  const items: MediaItem[] = [];
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    if (!file.type.startsWith('image/')) continue;
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+    if (!isImage && !isVideo) continue;
 
-    images.push({
+    items.push({
       id: `file-${i}-${file.name}`,
       src: URL.createObjectURL(file),
       alt: file.name,
+      ...(isVideo && { type: 'video' as const }),
     });
   }
 
-  return images;
+  return items;
 }

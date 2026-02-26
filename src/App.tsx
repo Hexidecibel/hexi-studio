@@ -4,12 +4,12 @@ import { ConfiguratorPanel } from './components/Configurator';
 import { EmptyState } from './components/Configurator/EmptyState';
 import { useConfigurator } from './hooks/useConfigurator';
 import { useGalleryPerf } from './hooks/useGalleryPerf';
-import type { ImageItem, LayoutType } from './types';
+import type { MediaItem, LayoutType } from './types';
 import './styles/theme.css';
 import './App.css';
 
 // 12 curated images for hero/demo
-const heroImages: ImageItem[] = [
+const heroImages: MediaItem[] = [
   { id: 'h1', src: 'https://picsum.photos/id/10/800/600', alt: 'Forest path', width: 800, height: 600, title: 'Forest Path', description: 'A winding trail through dense forest' },
   { id: 'h2', src: 'https://picsum.photos/id/11/800/1200', alt: 'Dark lake', width: 800, height: 1200, title: 'Dark Lake', description: 'Still waters reflecting the sky' },
   { id: 'h3', src: 'https://picsum.photos/id/14/1200/600', alt: 'Mountain bridge', width: 1200, height: 600, title: 'Mountain Bridge' },
@@ -22,10 +22,12 @@ const heroImages: ImageItem[] = [
   { id: 'h10', src: 'https://picsum.photos/id/21/800/1000', alt: 'Coastal cliff', width: 800, height: 1000, title: 'Coastal Cliff', description: 'Dramatic cliffs meeting the sea' },
   { id: 'h11', src: 'https://picsum.photos/id/22/800/600', alt: 'Ocean waves', width: 800, height: 600, title: 'Ocean Waves' },
   { id: 'h12', src: 'https://picsum.photos/id/24/1200/700', alt: 'Book pages', width: 1200, height: 700, title: 'Book Pages', description: 'Open book with golden light' },
+  { id: 'v1', src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', alt: 'Flames', width: 1280, height: 720, title: 'For Bigger Blazes', description: 'A short video demo', type: 'video', poster: 'https://picsum.photos/id/25/1280/720', duration: 15 },
+  { id: 'v2', src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', alt: 'Adventure', width: 1280, height: 720, title: 'For Bigger Escapes', type: 'video', poster: 'https://picsum.photos/id/26/1280/720', duration: 15 },
 ];
 
 // Generate 200+ images for perf demo using picsum with various aspect ratios
-function generatePerfImages(count: number): ImageItem[] {
+function generatePerfImages(count: number): MediaItem[] {
   const ratios = [
     { w: 800, h: 600 },
     { w: 600, h: 800 },
@@ -143,6 +145,8 @@ function App() {
           images={heroImages}
           layout={{ type: heroLayout, gap: heroGap }}
           enableLightbox
+          enableDownload
+          enableSlideshow
         />
       </section>
 
@@ -172,6 +176,8 @@ function App() {
                 images={heroImages.slice(0, 6)}
                 layout={{ type: l, gap: comparisonGap, ...(l === 'justified' ? { rowHeight: 160 } : {}) }}
                 enableLightbox
+                enableDownload
+                enableSlideshow
               />
             </div>
           ))}
@@ -206,6 +212,8 @@ function App() {
                 images={configurator.state.images}
                 layout={configurator.state.layout}
                 enableLightbox
+                enableDownload
+                enableSlideshow
               />
             )}
           </div>
@@ -253,6 +261,8 @@ function App() {
           images={perfImages}
           layout={{ type: perfLayout, gap: 8 }}
           enableLightbox
+          enableDownload
+          enableSlideshow
           virtualize
           onImageLoad={perf.onImageLoad}
         />
@@ -281,6 +291,8 @@ function App() {
             images={heroImages.slice(0, 8)}
             layout={{ type: 'masonry', gap: 12 }}
             enableLightbox
+            enableDownload
+            enableSlideshow
           />
         </div>
       </section>

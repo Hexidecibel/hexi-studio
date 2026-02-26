@@ -136,4 +136,54 @@ describe('GalleryImage', () => {
     const img = screen.getByRole('img');
     expect(img).toHaveAttribute('sizes');
   });
+
+  it('renders play overlay for video items', () => {
+    const videoItem: ImageItem = {
+      id: 'v1',
+      src: 'https://example.com/video.mp4',
+      alt: 'Test video',
+      type: 'video',
+      poster: 'https://example.com/poster.jpg',
+    };
+    render(<GalleryImage image={videoItem} index={0} onClick={() => {}} />);
+
+    // Simulate image load to show the overlay
+    const img = screen.getByRole('img');
+    fireEvent.load(img);
+
+    // Play overlay should be present (it has aria-hidden="true")
+    const overlay = document.querySelector('[aria-hidden="true"]');
+    expect(overlay).toBeInTheDocument();
+  });
+
+  it('renders duration badge for video items with duration', () => {
+    const videoItem: ImageItem = {
+      id: 'v1',
+      src: 'https://example.com/video.mp4',
+      alt: 'Test video',
+      type: 'video',
+      poster: 'https://example.com/poster.jpg',
+      duration: 125,
+    };
+    render(<GalleryImage image={videoItem} index={0} onClick={() => {}} />);
+
+    const img = screen.getByRole('img');
+    fireEvent.load(img);
+
+    expect(screen.getByText('2:05')).toBeInTheDocument();
+  });
+
+  it('uses poster as src for video items when no thumbnail', () => {
+    const videoItem: ImageItem = {
+      id: 'v1',
+      src: 'https://example.com/video.mp4',
+      alt: 'Test video',
+      type: 'video',
+      poster: 'https://example.com/poster.jpg',
+    };
+    render(<GalleryImage image={videoItem} index={0} />);
+
+    const img = screen.getByRole('img');
+    expect(img).toHaveAttribute('src', 'https://example.com/poster.jpg');
+  });
 });

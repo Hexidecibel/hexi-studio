@@ -1,7 +1,14 @@
 import { useState, useCallback } from 'react';
 import type { ImageItem } from '../../types';
+import { isVideoItem } from '../../types';
 import { useIntersectionObserver } from '../../hooks/useIntersectionObserver';
 import styles from './GalleryImage.module.css';
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 export interface GalleryImageProps {
   image: ImageItem;
@@ -38,7 +45,8 @@ export function GalleryImage({
   }, [onClick, image, index]);
 
   const shouldRenderImg = isIntersecting || loading === 'eager';
-  const src = image.thumbnail || image.src;
+  const isVideo = isVideoItem(image);
+  const src = image.thumbnail || (isVideo && image.poster) || image.src;
   const hasAspectRatio = image.width && image.height;
 
   const wrapperStyle: React.CSSProperties = {
@@ -79,6 +87,25 @@ export function GalleryImage({
     </>
   );
 
+  const fullContent = (
+    <>
+      {content}
+      {isVideo && isLoaded && (
+        <>
+          <div className={styles.playOverlay} aria-hidden="true">
+            <svg viewBox="0 0 48 48" className={styles.playIcon}>
+              <circle cx="24" cy="24" r="24" fill="rgba(0,0,0,0.5)" />
+              <polygon points="19,14 19,34 35,24" fill="white" />
+            </svg>
+          </div>
+          {image.duration != null && (
+            <span className={styles.duration}>{formatDuration(image.duration)}</span>
+          )}
+        </>
+      )}
+    </>
+  );
+
   const wrapperClassName = [
     styles.wrapper,
     'gallery-image',
@@ -95,14 +122,14 @@ export function GalleryImage({
         onClick={handleClick}
         aria-label={image.title || image.alt}
       >
-        {content}
+        {fullContent}
       </button>
     );
   }
 
   return (
     <div ref={ref as unknown as React.RefObject<HTMLDivElement>} className={wrapperClassName} style={wrapperStyle}>
-      {content}
+      {fullContent}
     </div>
   );
 }

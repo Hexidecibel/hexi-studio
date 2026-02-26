@@ -3,15 +3,27 @@
  */
 
 /**
- * Represents a single image in the gallery
+ * Video source variant for multi-format support
  */
-export interface ImageItem {
+export interface VideoSource {
+  /** Video source URL */
+  src: string;
+  /** MIME type (e.g., 'video/mp4') */
+  type: string;
+}
+
+/**
+ * Represents a single media item (image or video)
+ */
+export interface MediaItem {
   /** Unique identifier for the image */
   id: string;
   /** Primary image source URL */
   src: string;
   /** Alt text for accessibility */
   alt: string;
+  /** Media type — defaults to 'image' for backward compatibility */
+  type?: 'image' | 'video';
   /** Original width in pixels (helps with layout calculations) */
   width?: number;
   /** Original height in pixels (helps with layout calculations) */
@@ -26,8 +38,24 @@ export interface ImageItem {
   title?: string;
   /** Image description (displayed in lightbox) */
   description?: string;
+  /** Poster image for video items (used in grid and as lightbox loading placeholder) */
+  poster?: string;
+  /** Video format variants (e.g., mp4, webm) */
+  sources?: VideoSource[];
+  /** Video duration in seconds (for optional UI badge) */
+  duration?: number;
   /** Additional custom metadata */
   metadata?: Record<string, unknown>;
+}
+
+/** @deprecated Use MediaItem instead */
+export type ImageItem = MediaItem;
+
+/**
+ * Type guard to check if a media item is a video
+ */
+export function isVideoItem(item: MediaItem): boolean {
+  return item.type === 'video';
 }
 
 /**
@@ -56,23 +84,33 @@ export interface LayoutOptions {
  */
 export interface GalleryProps {
   /** Array of images to display */
-  images: ImageItem[];
+  images: MediaItem[];
   /** Layout configuration */
   layout?: LayoutOptions;
   /** Additional CSS class name */
   className?: string;
   /** Callback when an image is clicked */
-  onImageClick?: (image: ImageItem, index: number) => void;
+  onImageClick?: (image: MediaItem, index: number) => void;
   /** Enable built-in lightbox */
   enableLightbox?: boolean;
   /** Image loading strategy */
   loading?: 'lazy' | 'eager';
   /** Custom render function for images */
-  renderImage?: (image: ImageItem, index: number) => React.ReactNode;
+  renderImage?: (image: MediaItem, index: number) => React.ReactNode;
   /** Enable virtualization. true = auto (>50 items), number = custom threshold */
   virtualize?: boolean | number;
   /** Callback fired each time an image finishes loading */
   onImageLoad?: () => void;
+  /** Custom render when gallery has no images */
+  renderEmpty?: () => React.ReactNode;
+  /** Custom render for lightbox footer content */
+  renderLightboxFooter?: (image: MediaItem, index: number) => React.ReactNode;
+  /** Show download button in lightbox */
+  enableDownload?: boolean;
+  /** Enable slideshow mode in lightbox */
+  enableSlideshow?: boolean;
+  /** Slideshow interval in milliseconds (default 5000) */
+  slideshowInterval?: number;
 }
 
 /**
@@ -82,7 +120,7 @@ export interface SourceAdapter<TConfig = unknown> {
   /** Unique name for this adapter */
   name: string;
   /** Fetch images from the source */
-  fetch: (config: TConfig) => Promise<ImageItem[]>;
+  fetch: (config: TConfig) => Promise<MediaItem[]>;
   /** Optional validation for config */
   validate?: (config: TConfig) => boolean;
 }
@@ -92,7 +130,7 @@ export interface SourceAdapter<TConfig = unknown> {
  */
 export interface ConfiguratorState {
   /** Current images */
-  images: ImageItem[];
+  images: MediaItem[];
   /** Current layout options */
   layout: LayoutOptions;
   /** Theme overrides */
@@ -133,7 +171,7 @@ export interface ThemeTokens {
  * Paginated result for async adapters
  */
 export interface PaginatedResult {
-  images: ImageItem[];
+  images: MediaItem[];
   nextCursor?: string;
   hasMore: boolean;
 }
