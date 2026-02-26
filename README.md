@@ -35,17 +35,30 @@ A self-hosted photo gallery platform — image admin, gallery builder, and media
 - Public REST API for custom integrations
 - Cloud hook: `useHexiCloud()` for React apps
 
+**Deploy Anywhere**
+- Cloudflare Workers with D1 + R2 (zero-config scaling)
+- Self-hosted on any Node.js server (NAS, VPS, Raspberry Pi)
+- Pluggable storage adapters — swap between cloud and local
+- Real image transforms via sharp in self-hosted mode
+
 ## Architecture
 
+Runs on **Cloudflare Workers** or **self-hosted** on any Node.js server (NAS, VPS, etc.):
+
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Dashboard   │────▶│  Worker API  │────▶│  R2 Storage  │
-│  (React SPA) │     │  (Hono)      │     │  (Objects)   │
-└─────────────┘     │              │     └─────────────┘
-                     │              │────▶┌─────────────┐
-┌─────────────┐     │              │     │  D1 Database │
-│ Client Sites │────▶│              │     │  (SQLite)    │
-│ (embed/API)  │     └──────────────┘     └─────────────┘
+                    ┌─────────────────────────────────────────┐
+                    │            Hono API Server               │
+                    │                                         │
+                    │   ┌─────────────────────────────────┐   │
+                    │   │      Storage Adapters            │   │
+┌─────────────┐    │   │                                  │   │
+│  Dashboard   │───▶│   │  Cloudflare    │    Local/NAS    │   │
+│  (React SPA) │    │   │  R2 + D1       │    FS + SQLite  │   │
+└─────────────┘    │   │  (passthrough)  │    (sharp)      │   │
+                    │   └─────────────────────────────────┘   │
+┌─────────────┐    │                                         │
+│ Client Sites │───▶│                                         │
+│ (embed/API)  │    └─────────────────────────────────────────┘
 └─────────────┘
 ```
 
@@ -53,9 +66,10 @@ A self-hosted photo gallery platform — image admin, gallery builder, and media
 
 ### Prerequisites
 
-- Node.js 18+
-- npm or pnpm
-- Cloudflare account (for deployment) or local dev tools
+- Node.js 20+ (22 LTS recommended)
+- npm
+- For Cloudflare mode: Cloudflare account with D1 + R2
+- For local/self-hosted mode: any Linux/macOS server with filesystem storage
 
 ### Development
 
@@ -73,6 +87,31 @@ cd apps/worker && npm run dev    # API on :8787
 cd apps/dashboard && npm run dev # Dashboard on :5173
 ```
 
+### Self-Hosted / Local Mode
+
+Run the API on your own server with local filesystem storage and SQLite — no Cloudflare account needed.
+
+```bash
+cd apps/worker
+
+# Configure environment
+cp .env.local.example .env.local
+# Edit .env.local: set STORAGE_PATH, DATABASE_PATH, SMTP credentials
+
+# Create storage directory
+mkdir -p /path/to/media/files
+
+# Run database migrations
+cat migrations/0001_initial.sql migrations/0002_auto_login_and_library.sql | sqlite3 /path/to/media/hexi.db
+
+# Start the server
+npm run dev:local     # Development (with hot reload)
+npm run build:local   # Production build
+npm run start:local   # Production start
+```
+
+Local mode includes **real image transforms** via sharp (resize, WebP/AVIF conversion, quality adjustment) — the Cloudflare mode currently serves originals.
+
 ### Build
 
 ```bash
@@ -85,7 +124,7 @@ npm run lint     # Lint all packages
 
 ```
 apps/
-├── worker/          # Cloudflare Worker API (Hono, D1, R2)
+├── worker/          # API server (Hono) — runs on Cloudflare Workers or Node.js
 ├── dashboard/       # Dashboard SPA (React, Vite)
 └── embed/           # Embed script for HTML pages
 packages/
@@ -133,6 +172,8 @@ GET /api/v1/cdn/:userId/:mediaId/w_800,q_75,f_webp
 # Thumbnail preset
 GET /api/v1/cdn/:userId/:mediaId/thumb
 ```
+
+> In local/self-hosted mode, transforms are processed by [sharp](https://sharp.pixelplumbing.com/) and support real resizing, format conversion (WebP, AVIF), and quality adjustment.
 
 ### Auto-Login Tokens
 
@@ -232,6 +273,35 @@ cd apps/dashboard
 npm run build
 # Deploy dist/ to your static hosting (Cloudflare Pages, Vercel, Nginx, etc.)
 ```
+
+### Self-Hosted (NAS / VPS)
+
+```bash
+cd apps/worker
+
+# Configure
+cp .env.local.example .env.local
+# Edit .env.local with your paths and SMTP credentials
+
+# Initialize database
+mkdir -p /your/storage/path/files
+cat migrations/*.sql | sqlite3 /your/storage/path/hexi.db
+
+# Build and run
+npm run build:local
+npm run start:local    # Or use PM2: pm2 start dist/server.js --name hexi-api
+```
+
+Environment variables for local mode:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `RUNTIME_MODE` | Set to `local` for filesystem + SQLite | `local` |
+| `STORAGE_PATH` | Directory for media files | `/mnt/nas/hexi/files` |
+| `DATABASE_PATH` | Path to SQLite database file | `/mnt/nas/hexi/hexi.db` |
+| `PORT` | API server port | `8787` |
+| `CORS_ORIGIN` | Allowed origins | `*` |
+| `SMTP_HOST` | SMTP server for magic link emails | `smtp.example.com` |
 
 ## Database
 

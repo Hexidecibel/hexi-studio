@@ -5,7 +5,7 @@ A self-hosted photo gallery platform — image admin, gallery builder, and media
 ## Tech Stack
 
 - **Gallery component:** React 18 + TypeScript, published as `@hexi/gallery` npm package
-- **Worker API:** Cloudflare Worker with Hono framework, D1 (SQLite), R2 (object storage)
+- **Worker API:** Hono framework with pluggable storage adapters. Runs on Cloudflare Workers (D1 + R2) or Node.js/Bun (SQLite + local filesystem + sharp)
 - **Dashboard:** React 18 SPA (Vite), manages galleries, media library, and account settings
 - **Embed script:** Lightweight script for embedding galleries on any HTML page
 - **Shared:** Common types/utilities shared across packages
@@ -18,7 +18,9 @@ apps/
 ├── worker/              # Cloudflare Worker API
 │   ├── migrations/      # D1 SQL migrations (0001_initial, 0002_auto_login_and_library)
 │   └── src/
-│       ├── index.ts     # Hono app, route mounting, middleware
+│       ├── index.ts     # Cloudflare Worker entry point (re-exports app)
+│       ├── app.ts       # Shared Hono app setup (routes, middleware, adapters)
+│       ├── server.ts    # Node.js/Bun entry point (local mode, dotenv)
 │       ├── types.ts     # Env bindings, AuthUser, AuthVariables
 │       ├── routes/
 │       │   ├── auth.ts      # Magic link + auto-login tokens + sessions
@@ -33,6 +35,17 @@ apps/
 │       ├── utils/
 │       │   ├── crypto.ts    # generateToken, hashToken, generateId
 │       │   └── validation.ts # Email, slug, media type validation
+│       ├── adapters/
+│       │   ├── index.ts             # Factory: createAdapters() selects runtime
+│       │   ├── storage.ts           # StorageAdapter interface
+│       │   ├── database.ts          # DatabaseAdapter interface
+│       │   ├── image-transform.ts   # ImageTransformer interface
+│       │   ├── r2-storage.ts        # Cloudflare R2 implementation
+│       │   ├── d1-database.ts       # Cloudflare D1 implementation
+│       │   ├── passthrough-transform.ts  # No-op image transform (CF mode)
+│       │   ├── local-storage.ts     # Local filesystem implementation
+│       │   ├── sqlite-database.ts   # better-sqlite3 implementation
+│       │   └── sharp-transform.ts   # sharp image transform (local mode)
 │       └── services/
 │           └── email.ts     # SMTP or Resend email sending
 ├── dashboard/           # React SPA
@@ -76,6 +89,11 @@ packages/
 - `apps/worker`: `npm run dev` (wrangler), `npm run build` (wrangler deploy --dry-run)
 - `apps/dashboard`: `npm run dev` (vite), `npm run build` (tsc + vite build)
 
+### Local mode (Node.js, self-hosted)
+- `apps/worker`: `npm run dev:local` (tsx watch), `npm run build:local` (tsup), `npm run start:local` (node)
+- Config: `apps/worker/.env.local` (auto-loaded via dotenv)
+- Migrations: `cat migrations/*.sql | sqlite3 /path/to/hexi.db`
+
 ## Key Architecture Patterns
 
 - **Auth flow:** Magic link email → verify → session token (30-day), OR auto-login token → instant session
@@ -85,8 +103,33 @@ packages/
 - **Storage tracking:** `storage_used_bytes` incremented/decremented on upload/delete
 - **Media status:** `pending` → `ready` (three-step upload: get URL → upload binary → confirm with metadata)
 - **CDN transforms:** `/cdn/:tenantId/:mediaId/w_400,q_75,f_auto` — width, quality, format params
-- **R2 keys:** `tenants/{userId}/media/{mediaId}/original.{ext}` (gallery), `tenants/{userId}/library/{mediaId}/original.{ext}` (library)
+- **File keys:** `tenants/{userId}/media/{mediaId}/original.{ext}` (gallery), `tenants/{userId}/library/{mediaId}/original.{ext}` (library) — same pattern for both R2 and local filesystem
+- **Adapter pattern:** All routes use `c.get('db')` and `c.get('storage')` instead of direct Cloudflare bindings. Factory in `adapters/index.ts` selects implementation based on `RUNTIME_MODE` env var
 - **CDN fallback:** CDN route checks `media` table first, then `library_media` for R2 key lookup
+
+## Storage Adapter Architecture
+
+The API uses pluggable adapters for storage, database, and image transforms. Set `RUNTIME_MODE` in env to select:
+
+| Component | Cloudflare mode (default) | Local mode (`RUNTIME_MODE=local`) |
+|-----------|--------------------------|-----------------------------------|
+| Storage | R2Bucket via `R2StorageAdapter` | Filesystem via `LocalStorageAdapter` |
+| Database | D1 via `D1DatabaseAdapter` | better-sqlite3 via `SqliteDatabaseAdapter` |
+| Image transforms | `PassthroughTransformer` (serves original) | `SharpTransformer` (real resize/format) |
+| Email (SMTP) | `cloudflare:sockets` | `nodemailer` |
+| Entry point | `src/index.ts` → `export default app` | `src/server.ts` → `@hono/node-server` |
+
+Adapters are injected via Hono middleware and accessed with `c.get('db')`, `c.get('storage')`, `c.get('imageTransformer')`.
+
+### Local mode file layout (NAS)
+```
+/mnt/hexinas/hexi-media/
+  hexi.db                        # SQLite database
+  files/                         # Media file storage
+    tenants/{userId}/
+      media/{mediaId}/original.ext
+      library/{mediaId}/original.ext
+```
 
 ## Database Tables (D1/SQLite)
 
