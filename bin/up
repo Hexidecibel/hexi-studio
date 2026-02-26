@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -e
+
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source ~/.nvm/nvm.sh 2>/dev/null || true
+
+echo "Starting Hexi Gallery (local mode)..."
+
+# Start API
+if lsof -ti:4100 >/dev/null 2>&1; then
+  echo "API already running on :4100"
+else
+  cd "$DIR/apps/worker"
+  nohup npx tsx watch src/server.ts > /tmp/hexi-api.log 2>&1 &
+  echo $! > /tmp/hexi-api.pid
+  sleep 2
+  if curl -s http://localhost:4100/health > /dev/null 2>&1; then
+    echo "API started on :4100"
+  else
+    echo "API failed to start — check /tmp/hexi-api.log"
+  fi
+fi
+
+# Start Dashboard
+if lsof -ti:4101 >/dev/null 2>&1; then
+  echo "Dashboard already running on :4101"
+else
+  cd "$DIR/apps/dashboard"
+  nohup npx vite --host 0.0.0.0 --port 4101 > /tmp/hexi-dashboard.log 2>&1 &
+  echo $! > /tmp/hexi-dashboard.pid
+  sleep 3
+  if curl -s http://localhost:4101/ > /dev/null 2>&1; then
+    echo "Dashboard started on :4101"
+  else
+    echo "Dashboard failed to start — check /tmp/hexi-dashboard.log"
+  fi
+fi
+
+IP=$(hostname -I | awk '{print $1}')
+echo ""
+echo "Hexi Gallery is running:"
+echo "  Dashboard:  http://${IP}:4101"
+echo "  API:        http://${IP}:4100"
+echo "  Health:     http://${IP}:4100/health"
+echo ""
+echo "Logs:"
+echo "  API:        /tmp/hexi-api.log"
+echo "  Dashboard:  /tmp/hexi-dashboard.log"

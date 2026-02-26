@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -e
+
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source ~/.nvm/nvm.sh 2>/dev/null || true
+
+echo "Building Hexi Gallery..."
+cd "$DIR"
+
+# Build all packages via turborepo
+npm run build
+
+echo ""
+echo "Build complete."

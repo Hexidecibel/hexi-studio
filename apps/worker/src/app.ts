@@ -12,6 +12,15 @@ import { cdnRoutes } from './routes/cdn';
 
 export const app = new Hono<{ Bindings: Env; Variables: AdapterVariables }>();
 
+// Populate c.env from process.env in local/Node.js mode
+app.use('*', async (c, next) => {
+  if (typeof process !== 'undefined' && process.env?.RUNTIME_MODE === 'local') {
+    // @ts-expect-error -- populating env for local mode
+    c.env = { ...process.env };
+  }
+  await next();
+});
+
 // Adapter initialization — makes db, storage, imageTransformer available via c.get()
 app.use('*', async (c, next) => {
   const adapters = await createAdapters(c.env as unknown as Record<string, unknown>);

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+echo "Stopping Hexi Gallery..."
+
+# Stop API
+if lsof -ti:4100 >/dev/null 2>&1; then
+  lsof -ti:4100 | xargs kill 2>/dev/null
+  echo "API stopped"
+else
+  echo "API not running"
+fi
+
+# Stop Dashboard
+if lsof -ti:4101 >/dev/null 2>&1; then
+  lsof -ti:4101 | xargs kill 2>/dev/null
+  echo "Dashboard stopped"
+else
+  echo "Dashboard not running"
+fi
+
+# Clean up PID files
+rm -f /tmp/hexi-api.pid /tmp/hexi-dashboard.pid
+
+echo "Done."
