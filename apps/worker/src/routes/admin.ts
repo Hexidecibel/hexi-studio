@@ -112,8 +112,8 @@ adminRoutes.post('/users/:userId/tokens', async (c) => {
     'INSERT INTO auto_login_tokens (id, user_id, token_hash, label, expires_at) VALUES (?, ?, ?, ?, ?)'
   ).bind(id, userId, tokenHash, label, expiresAt).run();
 
-  const origin = new URL(c.req.url).origin;
-  const autoLoginUrl = `${origin}/auto-login?token=${plainToken}`;
+  const baseUrl = c.env.MAGIC_LINK_BASE_URL || new URL(c.req.url).origin;
+  const autoLoginUrl = `${baseUrl}/auto-login?token=${plainToken}`;
 
   return c.json({
     data: {
