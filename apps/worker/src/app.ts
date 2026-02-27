@@ -35,8 +35,19 @@ app.use('*', async (c, next) => {
 // Global middleware
 app.use('*', logger());
 app.use('/api/v1/*', async (c, next) => {
+  // Public and CDN routes have their own permissive CORS — skip global CORS for them
+  const path = c.req.path;
+  if (path.startsWith('/api/v1/public/') || path.startsWith('/api/v1/cdn/')) {
+    return next();
+  }
+  const configuredOrigin = c.env.CORS_ORIGIN || '*';
+  // When origin is '*', reflect the requesting origin back so credentials work.
+  // Browsers reject wildcard Access-Control-Allow-Origin with credentials: true.
+  const origin = configuredOrigin === '*'
+    ? (requestOrigin: string) => requestOrigin || '*'
+    : configuredOrigin;
   const corsMiddleware = cors({
-    origin: c.env.CORS_ORIGIN || '*',
+    origin,
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true,

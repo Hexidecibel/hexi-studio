@@ -8,6 +8,8 @@ export interface HexiCloudConfig {
   apiBase?: string;
   /** Number of items per page. Defaults to 50. */
   pageSize?: number;
+  /** Optional API key for authenticated access to public endpoints. */
+  apiKey?: string;
 }
 
 interface PublicGalleryResponse {
@@ -33,6 +35,11 @@ interface MediaPageResponse {
   hasMore: boolean;
 }
 
+function buildHeaders(apiKey?: string): HeadersInit | undefined {
+  if (!apiKey) return undefined;
+  return { 'X-API-Key': apiKey };
+}
+
 /**
  * Create an async adapter config that fetches from Hexi Gallery Cloud's public API.
  *
@@ -52,7 +59,9 @@ export function hexiCloudAdapter(config: HexiCloudConfig): AsyncAdapterConfig {
     const nextPage = currentPage + 1;
 
     if (nextPage === 1) {
-      const response = await fetch(`${apiBase}/public/galleries/${config.slug}`);
+      const response = await fetch(`${apiBase}/public/galleries/${config.slug}`, {
+        headers: buildHeaders(config.apiKey),
+      });
       if (!response.ok) {
         throw new Error(`Gallery not found: ${config.slug}`);
       }
@@ -67,7 +76,10 @@ export function hexiCloudAdapter(config: HexiCloudConfig): AsyncAdapterConfig {
     }
 
     const response = await fetch(
-      `${apiBase}/public/galleries/${config.slug}/media?page=${nextPage}&limit=${pageSize}`
+      `${apiBase}/public/galleries/${config.slug}/media?page=${nextPage}&limit=${pageSize}`,
+      {
+        headers: buildHeaders(config.apiKey),
+      }
     );
     if (!response.ok) {
       throw new Error('Failed to load media');

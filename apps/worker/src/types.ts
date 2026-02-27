@@ -20,6 +20,13 @@ export interface Env {
   RESEND_API_KEY?: string;
   // Admin
   ADMIN_EMAIL?: string;
+  // S3-compatible storage
+  S3_BUCKET?: string;
+  S3_REGION?: string;
+  S3_ENDPOINT?: string;
+  S3_ACCESS_KEY_ID?: string;
+  S3_SECRET_ACCESS_KEY?: string;
+  S3_FORCE_PATH_STYLE?: string;
 }
 
 export interface AuthUser {
@@ -32,8 +39,14 @@ export interface AuthUser {
   isAdmin: boolean;
 }
 
+export interface ApiKeyTenant {
+  id: string;
+  userId: string;
+}
+
 export type AuthVariables = {
   user: AuthUser;
+  apiTenant: ApiKeyTenant;
 };
 
 export type AdapterVariables = {

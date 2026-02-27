@@ -11,6 +11,33 @@ const library = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVari
 // All library routes require auth
 library.use('*', requireAuth);
 
+// POST /library/reorder - Batch reorder library media
+library.post('/reorder', async (c) => {
+  const user = c.get('user');
+
+  const body = await c.req.json<{
+    order?: string[];
+  }>().catch(() => ({} as Record<string, undefined>));
+
+  if (!body.order || !Array.isArray(body.order) || body.order.length === 0) {
+    return c.json({ error: 'order array is required' }, 400);
+  }
+
+  // Update sort_order for each library media item
+  const stmts = body.order.map((mediaId, index) =>
+    c.get('db').prepare(
+      "UPDATE library_media SET sort_order = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?"
+    ).bind(index, mediaId, user.id)
+  );
+
+  // Execute as batch
+  if (stmts.length > 0) {
+    await c.get('db').batch(stmts);
+  }
+
+  return c.json({ message: 'Reordered', count: stmts.length });
+});
+
 // POST /library/upload - Get upload URL for library media
 library.post('/upload', rateLimit({ windowMs: 60 * 1000, maxRequests: 30 }), async (c) => {
   const user = c.get('user');
@@ -79,8 +106,8 @@ library.put('/:mediaId/upload', async (c) => {
 
   // Update status and storage
   await c.get('db').prepare(
-    "UPDATE library_media SET status = 'ready', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
-  ).bind(mediaId).run();
+    "UPDATE library_media SET status = 'ready', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?"
+  ).bind(mediaId, user.id).run();
 
   await c.get('db').prepare(
     'UPDATE users SET storage_used_bytes = storage_used_bytes + ? WHERE id = ?'
@@ -157,7 +184,7 @@ library.get('/', async (c) => {
     bindings.push(`%"${tag}"%`);
   }
 
-  listSql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  listSql += ' ORDER BY sort_order ASC, created_at DESC LIMIT ? OFFSET ?';
 
   const countResult = await c.get('db').prepare(countSql).bind(...bindings).first();
   const total = (countResult?.total as number) || 0;
@@ -250,8 +277,8 @@ library.delete('/:id', async (c) => {
 
   // Soft-delete
   await c.get('db').prepare(
-    "UPDATE library_media SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?"
-  ).bind(id).run();
+    "UPDATE library_media SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?"
+  ).bind(id, user.id).run();
 
   // Delete from R2
   try {

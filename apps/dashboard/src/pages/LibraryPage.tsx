@@ -1,18 +1,24 @@
 import { useState, useEffect, useCallback, useRef, type DragEvent, type ChangeEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api, type LibraryItem } from '../lib/api';
+import { useUploadQueue } from '../hooks/useUploadQueue';
 
 export function LibraryPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState<Map<string, number>>(new Map());
+  const { uploads, processFiles, clearError } = useUploadQueue();
   const [editingItem, setEditingItem] = useState<LibraryItem | null>(null);
   const [editTags, setEditTags] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [filterTag, setFilterTag] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Drag-and-drop reorder state
+  const [localItems, setLocalItems] = useState<LibraryItem[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
   const loadItems = useCallback(async () => {
     try {
@@ -29,6 +35,67 @@ export function LibraryPage() {
     loadItems();
   }, [loadItems]);
 
+  // Keep localItems in sync with items when not dragging
+  useEffect(() => {
+    if (dragIndex === null) {
+      setLocalItems(items);
+    }
+  }, [items, dragIndex]);
+
+  const handleReorderDragStart = useCallback((e: DragEvent, index: number) => {
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  }, []);
+
+  const handleReorderDragOver = useCallback((e: DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragIndex !== null && index !== dragIndex) {
+      setOverIndex(index);
+    }
+  }, [dragIndex]);
+
+  const handleReorderDragLeave = useCallback(() => {
+    setOverIndex(null);
+  }, []);
+
+  const handleReorderDrop = useCallback((e: DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (dragIndex === null || dragIndex === dropIndex) {
+      setDragIndex(null);
+      setOverIndex(null);
+      return;
+    }
+
+    // Compute new order by moving the dragged item to the drop position
+    const reordered = [...localItems];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+
+    // Optimistic update
+    setLocalItems(reordered);
+    setDragIndex(null);
+    setOverIndex(null);
+
+    // Persist via API
+    const newOrder = reordered.map((item) => item.id);
+    api.library.reorder(newOrder).then(() => {
+      loadItems();
+    }).catch((err) => {
+      console.error('Reorder failed:', err);
+      // Revert on failure
+      setLocalItems(items);
+    });
+  }, [dragIndex, localItems, items, loadItems]);
+
+  const handleReorderDragEnd = useCallback(() => {
+    setDragIndex(null);
+    setOverIndex(null);
+  }, []);
+
   // Collect all unique tags for filter chips
   const allTags = Array.from(new Set(
     items.flatMap((item) => {
@@ -37,20 +104,25 @@ export function LibraryPage() {
     })
   )).sort();
 
-  const uploadFile = useCallback(async (file: File) => {
-    try {
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    processFiles(Array.from(files), async (file, onProgress) => {
+      onProgress(10, 'getting-url');
+
+      // 1. Get upload URL
       const { data: uploadInfo } = await api.library.getUploadUrl({
         filename: file.name,
         contentType: file.type,
         fileSize: file.size,
       });
 
-      setUploading((prev) => new Map(prev).set(uploadInfo.mediaId, 0));
+      onProgress(50, 'uploading');
 
+      // 2. Upload file
       await api.library.upload(uploadInfo.mediaId, file);
-      setUploading((prev) => new Map(prev).set(uploadInfo.mediaId, 50));
 
-      // Get dimensions for images
+      onProgress(80, 'confirming');
+
+      // 3. Get dimensions for images
       let width: number | undefined;
       let height: number | undefined;
       if (file.type.startsWith('image/')) {
@@ -59,29 +131,17 @@ export function LibraryPage() {
         height = dims.height;
       }
 
+      // 4. Confirm upload
       await api.library.confirm({
         mediaId: uploadInfo.mediaId,
         width,
         height,
         alt: file.name.replace(/\.[^.]+$/, ''),
       });
-
-      setUploading((prev) => {
-        const next = new Map(prev);
-        next.delete(uploadInfo.mediaId);
-        return next;
-      });
-
-      await loadItems();
-    } catch (err) {
-      console.error('Upload failed:', err);
-      setUploading(new Map());
-    }
-  }, [loadItems]);
-
-  const handleFiles = useCallback((files: FileList | File[]) => {
-    Array.from(files).forEach(uploadFile);
-  }, [uploadFile]);
+    }, () => {
+      loadItems();
+    });
+  }, [loadItems, processFiles]);
 
   const handleDrop = useCallback((e: DragEvent) => {
     e.preventDefault();
@@ -191,12 +251,25 @@ export function LibraryPage() {
             </div>
           </div>
 
-          {uploading.size > 0 && (
-            <div className="upload-progress">
-              {Array.from(uploading.entries()).map(([id, _progress]) => (
-                <div key={id} className="upload-progress-item">
-                  <div className="upload-progress-bar" />
-                  <span>Uploading...</span>
+          {uploads.length > 0 && (
+            <div className="upload-progress-list">
+              {uploads.map(item => (
+                <div key={item.localId} className={`upload-progress-item ${item.status === 'error' ? 'upload-error' : ''}`}>
+                  <div className="upload-progress-file-name">{item.fileName}</div>
+                  <div className="upload-progress-track">
+                    <div
+                      className="upload-progress-fill"
+                      style={{ width: `${item.progress}%` }}
+                    />
+                  </div>
+                  <div className="upload-progress-status">
+                    {item.status === 'error' ? (
+                      <span onClick={() => clearError(item.localId)} style={{cursor:'pointer'}}>&#10005; {item.error}</span>
+                    ) : item.status === 'done' ? 'Done' :
+                      item.status === 'queued' ? 'Queued' :
+                      item.status === 'getting-url' ? 'Preparing...' :
+                      item.status === 'uploading' ? 'Uploading...' : 'Confirming...'}
+                  </div>
                 </div>
               ))}
             </div>
@@ -231,16 +304,37 @@ export function LibraryPage() {
 
         {/* Library grid */}
         <section className="editor-section">
-          <h2>Library ({items.length} items)</h2>
+          <h2>Library ({localItems.length} items)</h2>
           {loading ? (
             <div className="page-loading"><div className="loading-spinner" /></div>
-          ) : items.length > 0 ? (
+          ) : localItems.length > 0 ? (
             <div className="media-grid">
-              {items.map((item) => (
-                <div key={item.id} className="media-item">
+              {localItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  className={
+                    'media-item' +
+                    (dragIndex === index ? ' media-item-dragging' : '') +
+                    (overIndex === index && dragIndex !== null && dragIndex < index ? ' media-item-drop-after' : '') +
+                    (overIndex === index && dragIndex !== null && dragIndex > index ? ' media-item-drop-before' : '')
+                  }
+                  draggable
+                  onDragStart={(e) => handleReorderDragStart(e, index)}
+                  onDragOver={(e) => handleReorderDragOver(e, index)}
+                  onDragLeave={handleReorderDragLeave}
+                  onDrop={(e) => handleReorderDrop(e, index)}
+                  onDragEnd={handleReorderDragEnd}
+                >
                   <div className="media-item-preview">
                     {item.media_type === 'video' ? (
-                      <div className="video-placeholder">Video</div>
+                      <div className="video-thumb-container">
+                        <video className="video-thumb" src={getMediaUrl(item)} preload="metadata" muted playsInline />
+                        <div className="video-overlay">
+                          <div className="video-play-icon">
+                            <svg viewBox="0 0 24 24"><polygon points="8,5 20,12 8,19" /></svg>
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <img src={getMediaUrl(item)} alt={item.alt} loading="lazy" />
                     )}

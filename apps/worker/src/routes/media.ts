@@ -160,8 +160,8 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
     .bind(fileSize, user.id)
     .run();
 
-  const media = await c.get('db').prepare('SELECT * FROM media WHERE id = ?')
-    .bind(mediaId)
+  const media = await c.get('db').prepare('SELECT * FROM media WHERE id = ? AND user_id = ?')
+    .bind(mediaId, user.id)
     .first();
 
   return c.json({ data: media }, 201);
@@ -226,8 +226,8 @@ mediaRoutes.post('/confirm', async (c) => {
     .bind(...values)
     .run();
 
-  const updated = await c.get('db').prepare('SELECT * FROM media WHERE id = ?')
-    .bind(body.mediaId)
+  const updated = await c.get('db').prepare('SELECT * FROM media WHERE id = ? AND user_id = ?')
+    .bind(body.mediaId, user.id)
     .first();
 
   return c.json({ data: updated });
@@ -331,8 +331,8 @@ mediaRoutes.patch('/:mid', async (c) => {
     .bind(...values)
     .run();
 
-  const updated = await c.get('db').prepare('SELECT * FROM media WHERE id = ?')
-    .bind(mid)
+  const updated = await c.get('db').prepare('SELECT * FROM media WHERE id = ? AND user_id = ?')
+    .bind(mid, user.id)
     .first();
 
   return c.json({ data: updated });

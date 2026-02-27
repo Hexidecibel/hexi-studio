@@ -6,6 +6,8 @@ export interface HexiCloudOptions {
   apiBase?: string;
   /** Number of items per page. Defaults to 50. */
   pageSize?: number;
+  /** Optional API key for authenticated access to public endpoints. */
+  apiKey?: string;
 }
 
 export interface HexiCloudResult {
@@ -64,6 +66,11 @@ interface MediaPageResponse {
   hasMore: boolean;
 }
 
+function buildHeaders(apiKey?: string): HeadersInit | undefined {
+  if (!apiKey) return undefined;
+  return { 'X-API-Key': apiKey };
+}
+
 /**
  * Hook to connect to a Hexi Gallery Cloud gallery.
  * Fetches gallery config and media, handles pagination.
@@ -88,6 +95,7 @@ interface MediaPageResponse {
 export function useHexiCloud(slug: string, options?: HexiCloudOptions): HexiCloudResult {
   const apiBase = options?.apiBase || 'https://api.hexi.gallery/api/v1';
   const pageSize = options?.pageSize || 50;
+  const apiKey = options?.apiKey;
 
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +112,9 @@ export function useHexiCloud(slug: string, options?: HexiCloudOptions): HexiClou
     setItems([]);
     pageRef.current = 0;
 
-    fetch(`${apiBase}/public/galleries/${slug}`)
+    fetch(`${apiBase}/public/galleries/${slug}`, {
+      headers: buildHeaders(apiKey),
+    })
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(`Gallery not found: ${slug}`);
@@ -127,7 +137,7 @@ export function useHexiCloud(slug: string, options?: HexiCloudOptions): HexiClou
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [slug, apiBase]);
+  }, [slug, apiBase, apiKey]);
 
   const loadMore = useCallback(() => {
     if (loading || !hasMore) return;
@@ -135,7 +145,9 @@ export function useHexiCloud(slug: string, options?: HexiCloudOptions): HexiClou
     const nextPage = pageRef.current + 1;
     setLoading(true);
 
-    fetch(`${apiBase}/public/galleries/${slug}/media?page=${nextPage}&limit=${pageSize}`)
+    fetch(`${apiBase}/public/galleries/${slug}/media?page=${nextPage}&limit=${pageSize}`, {
+      headers: buildHeaders(apiKey),
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error('Failed to load more');
         const data: MediaPageResponse = await response.json();
@@ -147,7 +159,7 @@ export function useHexiCloud(slug: string, options?: HexiCloudOptions): HexiClou
       })
       .catch((err) => console.error('Failed to load more:', err))
       .finally(() => setLoading(false));
-  }, [slug, apiBase, pageSize, loading, hasMore]);
+  }, [slug, apiBase, apiKey, pageSize, loading, hasMore]);
 
   return { items, loading, error, config, name, hasMore, loadMore, total };
 }

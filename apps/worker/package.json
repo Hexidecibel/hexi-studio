@@ -15,6 +15,7 @@
     "clean": "rm -rf dist .wrangler"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.999.0",
     "@hono/node-server": "^1.19.9",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",

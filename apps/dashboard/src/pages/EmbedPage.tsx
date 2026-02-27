@@ -30,7 +30,7 @@ export function EmbedPage() {
 
   if (!gallery) return null;
 
-  const scriptTag = `<div id="hexi-gallery" data-gallery="${gallery.slug}"></div>
+  const scriptTag = `<div id="hexi-gallery" data-gallery="${gallery.slug}" data-api-key="YOUR_API_KEY"></div>
 <script src="https://cdn.hexi.gallery/embed.js" async></script>`;
 
   const npmUsage = `npm install @hexi/gallery
@@ -73,6 +73,10 @@ function MyGallery() {
               {copied === 'script' ? 'Copied!' : 'Copy'}
             </button>
           </div>
+          <p className="text-muted" style={{ marginTop: '0.5rem' }}>
+            Replace <code>YOUR_API_KEY</code> with an API key from{' '}
+            <a href="/account" style={{ color: 'var(--accent)' }}>Account &rarr; API Keys</a>.
+          </p>
         </section>
 
         {/* NPM package */}

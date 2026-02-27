@@ -6,9 +6,10 @@ import type { MediaItem, GalleryConfig } from './types';
 
 interface EmbedAppProps {
   slug: string;
+  apiKey?: string;
 }
 
-function EmbedApp({ slug }: EmbedAppProps) {
+function EmbedApp({ slug, apiKey }: EmbedAppProps) {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [config, setConfig] = useState<GalleryConfig>({});
   const [loading, setLoading] = useState(true);
@@ -18,7 +19,7 @@ function EmbedApp({ slug }: EmbedAppProps) {
 
   // Load initial data
   useEffect(() => {
-    fetchGallery(slug)
+    fetchGallery(slug, apiKey)
       .then((data) => {
         setConfig(data.gallery.config);
         setItems(data.media.items);
@@ -34,7 +35,7 @@ function EmbedApp({ slug }: EmbedAppProps) {
     if (loading) return;
     const nextPage = page + 1;
     setLoading(true);
-    fetchMediaPage(slug, nextPage)
+    fetchMediaPage(slug, nextPage, 50, apiKey)
       .then((data) => {
         setItems((prev) => [...prev, ...data.items]);
         setHasMore(data.hasMore);
@@ -95,7 +96,8 @@ function init() {
     // Don't re-initialize
     if (el.getAttribute('data-hexi-initialized')) return;
     el.setAttribute('data-hexi-initialized', 'true');
-    render(h(EmbedApp, { slug }), el);
+    const apiKey = el.getAttribute('data-api-key') || undefined;
+    render(h(EmbedApp, { slug, apiKey }), el);
   });
 }
 

@@ -3,6 +3,7 @@ import type { Env, AdapterVariables } from '../types';
 import type { AuthVariables } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { requireAuth } from '../middleware/auth';
+import { requireApiKey } from '../middleware/apiKey';
 
 export const publicRoutes = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVariables }>();
 
@@ -133,27 +134,28 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
 });
 
 // Public single media info (for library items)
-publicRoutes.get('/media/:id', async (c) => {
+publicRoutes.get('/media/:id', requireApiKey, async (c) => {
   const id = c.req.param('id');
+  const { userId } = c.get('apiTenant');
 
   const item = await c.get('db').prepare(
-    "SELECT id, user_id, width, height, alt, title, description, media_type, content_type FROM library_media WHERE id = ? AND status = 'ready' AND deleted_at IS NULL"
-  ).bind(id).first();
+    "SELECT id, user_id, width, height, alt, title, description, media_type, content_type FROM library_media WHERE id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL"
+  ).bind(id, userId).first();
 
   if (!item) {
     return c.json({ error: 'Not found' }, 404);
   }
 
-  const userId = item.user_id as string;
+  const tenantId = item.user_id as string;
   const mediaId = item.id as string;
 
-  const src = `/api/v1/cdn/${userId}/${mediaId}/original`;
+  const src = `/api/v1/cdn/${tenantId}/${mediaId}/original`;
   const thumbnail = item.media_type === 'image'
-    ? `/api/v1/cdn/${userId}/${mediaId}/w_400,q_75,f_auto`
+    ? `/api/v1/cdn/${tenantId}/${mediaId}/w_400,q_75,f_auto`
     : undefined;
 
   const srcSet = item.media_type === 'image'
-    ? [400, 800, 1200, 1600].map(w => `/api/v1/cdn/${userId}/${mediaId}/w_${w},q_75,f_auto ${w}w`).join(', ')
+    ? [400, 800, 1200, 1600].map(w => `/api/v1/cdn/${tenantId}/${mediaId}/w_${w},q_75,f_auto ${w}w`).join(', ')
     : undefined;
 
   return c.json({
@@ -171,21 +173,22 @@ publicRoutes.get('/media/:id', async (c) => {
 });
 
 // GET /public/galleries/:slug — Public gallery config + first page of media
-publicRoutes.get('/galleries/:slug', async (c) => {
+publicRoutes.get('/galleries/:slug', requireApiKey, async (c) => {
   const slug = c.req.param('slug');
+  const { userId } = c.get('apiTenant');
 
   if (!slug) {
     return c.json({ error: 'Gallery slug is required' }, 400);
   }
 
-  // Find published gallery by slug (across all users)
+  // Find published gallery by slug scoped to the API key's tenant
   const gallery = await c.get('db').prepare(
     `SELECT g.id, g.user_id, g.name, g.slug, g.config
      FROM galleries g
-     WHERE g.slug = ? AND g.published = 1 AND g.deleted_at IS NULL
+     WHERE g.slug = ? AND g.user_id = ? AND g.published = 1 AND g.deleted_at IS NULL
      LIMIT 1`
   )
-    .bind(slug)
+    .bind(slug, userId)
     .first<{ id: string; user_id: string; name: string; slug: string; config: string }>();
 
   if (!gallery) {
@@ -237,8 +240,9 @@ publicRoutes.get('/galleries/:slug', async (c) => {
 });
 
 // GET /public/galleries/:slug/media — Public media pagination
-publicRoutes.get('/galleries/:slug/media', async (c) => {
+publicRoutes.get('/galleries/:slug/media', requireApiKey, async (c) => {
   const slug = c.req.param('slug');
+  const { userId } = c.get('apiTenant');
 
   if (!slug) {
     return c.json({ error: 'Gallery slug is required' }, 400);
@@ -246,10 +250,10 @@ publicRoutes.get('/galleries/:slug/media', async (c) => {
 
   const gallery = await c.get('db').prepare(
     `SELECT id, user_id FROM galleries
-     WHERE slug = ? AND published = 1 AND deleted_at IS NULL
+     WHERE slug = ? AND user_id = ? AND published = 1 AND deleted_at IS NULL
      LIMIT 1`
   )
-    .bind(slug)
+    .bind(slug, userId)
     .first<{ id: string; user_id: string }>();
 
   if (!gallery) {

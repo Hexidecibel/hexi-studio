@@ -21,16 +21,25 @@ function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
-export async function fetchGallery(slug: string): Promise<GalleryResponse> {
-  const response = await fetch(`${API_BASE}/public/galleries/${slug}`);
+function buildHeaders(apiKey?: string): HeadersInit | undefined {
+  if (!apiKey) return undefined;
+  return { 'X-API-Key': apiKey };
+}
+
+export async function fetchGallery(slug: string, apiKey?: string): Promise<GalleryResponse> {
+  const response = await fetch(`${API_BASE}/public/galleries/${slug}`, {
+    headers: buildHeaders(apiKey),
+  });
   if (!response.ok) {
     throw new Error(`Gallery not found: ${slug}`);
   }
   return response.json();
 }
 
-export async function fetchMediaPage(slug: string, page: number, limit = 50): Promise<MediaPageResponse> {
-  const response = await fetch(`${API_BASE}/public/galleries/${slug}/media?page=${page}&limit=${limit}`);
+export async function fetchMediaPage(slug: string, page: number, limit = 50, apiKey?: string): Promise<MediaPageResponse> {
+  const response = await fetch(`${API_BASE}/public/galleries/${slug}/media?page=${page}&limit=${limit}`, {
+    headers: buildHeaders(apiKey),
+  });
   if (!response.ok) {
     throw new Error('Failed to load media');
   }
