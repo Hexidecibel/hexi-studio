@@ -20,7 +20,7 @@ apps/
 │   └── src/
 │       ├── index.ts     # Cloudflare Worker entry point (re-exports app)
 │       ├── app.ts       # Shared Hono app setup (routes, middleware, adapters)
-│       ├── server.ts    # Node.js/Bun entry point (local mode, dotenv)
+│       ├── server.ts    # Node.js/Bun entry point (local mode, dotenv, serves dashboard SPA)
 │       ├── types.ts     # Env bindings, AuthUser, AuthVariables
 │       ├── routes/
 │       │   ├── auth.ts      # Magic link + auto-login tokens + sessions
@@ -94,6 +94,14 @@ packages/
 - Config: `apps/worker/.env.local` (auto-loaded via dotenv)
 - Migrations: `cat migrations/*.sql | sqlite3 /path/to/hexi.db`
 
+### Docker (production self-hosted)
+- `docker compose build` — Build production image (3-stage: build → deps → runtime)
+- `docker compose up -d` — Start container
+- `docker compose logs -f` — Tail logs
+- Compose file: `/mnt/hexinas/apps/hexi-gallery/docker-compose.yml`
+- Data volume: `/mnt/hexinas/hexi-media` → `/data` (SQLite DB + media files)
+- The API serves the built dashboard SPA from `./public` (copied during Docker build)
+
 ## Key Architecture Patterns
 
 - **Auth flow:** Magic link email → verify → session token (30-day), OR auto-login token → instant session
@@ -106,6 +114,7 @@ packages/
 - **File keys:** `tenants/{userId}/media/{mediaId}/original.{ext}` (gallery), `tenants/{userId}/library/{mediaId}/original.{ext}` (library) — same pattern for both R2 and local filesystem
 - **Adapter pattern:** All routes use `c.get('db')` and `c.get('storage')` instead of direct Cloudflare bindings. Factory in `adapters/index.ts` selects implementation based on `RUNTIME_MODE` env var
 - **CDN fallback:** CDN route checks `media` table first, then `library_media` for R2 key lookup
+- **Static serving:** In production (Docker), `server.ts` serves the built dashboard SPA from `./public` via `serveStatic`. API 404s are scoped to `/api/*` so non-API routes fall through to the SPA
 
 ## Storage Adapter Architecture
 
@@ -118,6 +127,7 @@ The API uses pluggable adapters for storage, database, and image transforms. Set
 | Image transforms | `PassthroughTransformer` (serves original) | `SharpTransformer` (real resize/format) |
 | Email (SMTP) | `cloudflare:sockets` | `nodemailer` |
 | Entry point | `src/index.ts` → `export default app` | `src/server.ts` → `@hono/node-server` |
+| Dashboard | Deployed separately (Cloudflare Pages, etc.) | Served from `./public` by API (Docker) |
 
 Adapters are injected via Hono middleware and accessed with `c.get('db')`, `c.get('storage')`, `c.get('imageTransformer')`.
 

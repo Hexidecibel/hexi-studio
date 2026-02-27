@@ -37,7 +37,8 @@ A self-hosted photo gallery platform — image admin, gallery builder, and media
 
 **Deploy Anywhere**
 - Cloudflare Workers with D1 + R2 (zero-config scaling)
-- Self-hosted on any Node.js server (NAS, VPS, Raspberry Pi)
+- Self-hosted via Docker (single container, bind-mount data)
+- Self-hosted on bare metal Node.js (NAS, VPS, Raspberry Pi)
 - Pluggable storage adapters — swap between cloud and local
 - Real image transforms via sharp in self-hosted mode
 
@@ -274,7 +275,49 @@ npm run build
 # Deploy dist/ to your static hosting (Cloudflare Pages, Vercel, Nginx, etc.)
 ```
 
-### Self-Hosted (NAS / VPS)
+### Docker (Recommended for Self-Hosting)
+
+Single container — builds the API and dashboard together, serves everything from one image.
+
+```bash
+# Clone the repo
+git clone https://github.com/your-org/hexi-photo-gallery.git
+cd hexi-photo-gallery
+
+# Create data directory
+mkdir -p /path/to/media/files
+
+# Run database migrations
+cat apps/worker/migrations/*.sql | sqlite3 /path/to/media/hexi.db
+
+# Build and start
+docker compose build
+docker compose up -d
+```
+
+The container:
+- Builds the dashboard SPA and API into a single Node.js image
+- Serves the dashboard at `/` and API at `/api/v1/*`
+- Uses SQLite + local filesystem + sharp for image transforms
+- Expects data at `/data` (bind-mount your storage directory)
+
+Environment variables:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `RUNTIME_MODE` | Must be `local` | `local` |
+| `DATABASE_PATH` | SQLite DB path inside container | `/data/hexi.db` |
+| `STORAGE_PATH` | Media files path inside container | `/data/files` |
+| `CORS_ORIGIN` | Your dashboard URL | `https://gallery.example.com` |
+| `MAGIC_LINK_BASE_URL` | Base URL for magic link emails | `https://gallery.example.com` |
+| `SMTP_HOST` | SMTP server | `smtp.example.com` |
+| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_USER` | SMTP username | `user@example.com` |
+| `SMTP_PASS` | SMTP password | `secret` |
+| `SMTP_FROM` | From address for emails | `Gallery <noreply@example.com>` |
+| `ADMIN_EMAIL` | Admin user email (auto-created) | `admin@example.com` |
+
+### Bare Metal (without Docker)
 
 ```bash
 cd apps/worker
