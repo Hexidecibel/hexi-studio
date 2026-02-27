@@ -8,11 +8,13 @@ interface User {
   plan: string;
   storageUsedBytes: number;
   storageLimitBytes: number;
+  isAdmin: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   isLoading: boolean;
   login: (token: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -61,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isAdmin: user?.isAdmin ?? false, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

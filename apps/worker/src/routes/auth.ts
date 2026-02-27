@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, AuthVariables, AdapterVariables } from '../types';
 import type { DatabaseAdapter } from '../adapters/database';
 import { requireAuth } from '../middleware/auth';
+import { requireAdmin } from '../middleware/admin';
 import { rateLimit } from '../middleware/rateLimit';
 import { generateToken, hashToken, generateId } from '../utils/crypto';
 import { isValidEmail } from '../utils/validation';
@@ -32,6 +33,15 @@ authRoutes.post('/magic-link', async (c) => {
 
   if (!email || !isValidEmail(email)) {
     return c.json({ error: 'Valid email is required' }, 400);
+  }
+
+  // Only allow existing users to log in
+  const existingUser = await c.get('db').prepare(
+    `SELECT id FROM users WHERE email = ? AND deleted_at IS NULL`
+  ).bind(email).first<{ id: string }>();
+
+  if (!existingUser) {
+    return c.json({ error: 'Account not found. Contact your administrator.' }, 403);
   }
 
   // Generate magic link token
@@ -93,17 +103,13 @@ authRoutes.get('/verify', async (c) => {
     .bind(magicLink.id)
     .run();
 
-  // Find or create user
-  let user = await c.get('db').prepare(`SELECT id FROM users WHERE email = ?`)
-    .bind(email)
-    .first<{ id: string }>();
+  // Look up existing user — only pre-created accounts can log in
+  const user = await c.get('db').prepare(
+    `SELECT id FROM users WHERE email = ? AND deleted_at IS NULL`
+  ).bind(email).first<{ id: string }>();
 
   if (!user) {
-    const userId = generateId();
-    await c.get('db').prepare(`INSERT INTO users (id, email) VALUES (?, ?)`)
-      .bind(userId, email)
-      .run();
-    user = { id: userId };
+    return c.json({ error: 'Account not found. Contact your administrator.' }, 403);
   }
 
   // Create session (30 day expiry)
@@ -135,11 +141,12 @@ authRoutes.get('/me', requireAuth, async (c) => {
     plan: user.plan,
     storageUsedBytes: user.storageUsedBytes,
     storageLimitBytes: user.storageLimitBytes,
+    isAdmin: user.isAdmin,
   });
 });
 
-// POST /auth/auto-login-tokens — Generate a new auto-login token (requires auth)
-authRoutes.post('/auto-login-tokens', requireAuth, async (c) => {
+// POST /auth/auto-login-tokens — Generate a new auto-login token (requires auth + admin)
+authRoutes.post('/auto-login-tokens', requireAuth, requireAdmin, async (c) => {
   const user = c.get('user');
   const body = await c.req.json<{ label?: string; expiresInDays?: number }>();
 
@@ -169,8 +176,8 @@ authRoutes.post('/auto-login-tokens', requireAuth, async (c) => {
   }, 201);
 });
 
-// GET /auth/auto-login-tokens — List tokens (requires auth)
-authRoutes.get('/auto-login-tokens', requireAuth, async (c) => {
+// GET /auth/auto-login-tokens — List tokens (requires auth + admin)
+authRoutes.get('/auto-login-tokens', requireAuth, requireAdmin, async (c) => {
   const user = c.get('user');
 
   const tokens = await c.get('db').prepare(
@@ -180,8 +187,8 @@ authRoutes.get('/auto-login-tokens', requireAuth, async (c) => {
   return c.json({ data: tokens.results });
 });
 
-// DELETE /auth/auto-login-tokens/:id — Revoke a token (requires auth)
-authRoutes.delete('/auto-login-tokens/:id', requireAuth, async (c) => {
+// DELETE /auth/auto-login-tokens/:id — Revoke a token (requires auth + admin)
+authRoutes.delete('/auto-login-tokens/:id', requireAuth, requireAdmin, async (c) => {
   const user = c.get('user');
   const tokenId = c.req.param('id');
 
@@ -217,9 +224,9 @@ authRoutes.get('/auto', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 })
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
-  // Verify the user exists
+  // Verify the user exists and is not soft-deleted
   const user = await c.get('db').prepare(
-    'SELECT id FROM users WHERE id = ?'
+    'SELECT id FROM users WHERE id = ? AND deleted_at IS NULL'
   ).bind(record.user_id).first();
 
   if (!user) {

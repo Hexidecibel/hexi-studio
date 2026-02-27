@@ -26,7 +26,7 @@ export const requireAuth = createMiddleware<{
     `SELECT s.user_id, s.expires_at, u.id, u.email, u.name, u.plan, u.storage_used_bytes, u.storage_limit_bytes
      FROM sessions s
      JOIN users u ON s.user_id = u.id
-     WHERE s.token_hash = ? AND s.expires_at > datetime('now')`
+     WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND u.deleted_at IS NULL`
   )
     .bind(tokenHash)
     .first<{
@@ -49,6 +49,7 @@ export const requireAuth = createMiddleware<{
     plan: session.plan,
     storageUsedBytes: session.storage_used_bytes,
     storageLimitBytes: session.storage_limit_bytes,
+    isAdmin: !!c.env.ADMIN_EMAIL && session.email === c.env.ADMIN_EMAIL,
   };
 
   c.set('user', user);

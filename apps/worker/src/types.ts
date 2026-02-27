@@ -18,6 +18,8 @@ export interface Env {
   SMTP_FROM?: string;
   // Email: Resend API (alternative)
   RESEND_API_KEY?: string;
+  // Admin
+  ADMIN_EMAIL?: string;
 }
 
 export interface AuthUser {
@@ -27,6 +29,7 @@ export interface AuthUser {
   plan: string;
   storageUsedBytes: number;
   storageLimitBytes: number;
+  isAdmin: boolean;
 }
 
 export type AuthVariables = {

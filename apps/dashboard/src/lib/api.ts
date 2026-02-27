@@ -48,7 +48,7 @@ export const api = {
       request<{ token: string; expiresAt: string }>(
         `/auth/verify?token=${token}&email=${encodeURIComponent(email)}`
       ),
-    me: () => request<{ id: string; email: string; name: string | null; plan: string; storageUsedBytes: number; storageLimitBytes: number }>('/auth/me'),
+    me: () => request<{ id: string; email: string; name: string | null; plan: string; storageUsedBytes: number; storageLimitBytes: number; isAdmin: boolean }>('/auth/me'),
     logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
     autoLogin: (token: string) =>
       request<{ token: string; expiresAt: string }>(
@@ -196,6 +196,31 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ message: string }>(`/library/${id}`, { method: 'DELETE' }),
+  },
+
+  admin: {
+    listUsers: () =>
+      request<{ data: Array<{ id: string; email: string; name: string | null; plan: string; storage_used_bytes: number; storage_limit_bytes: number; created_at: string }> }>(
+        '/admin/users'
+      ),
+    createUser: (data: { email: string; name?: string; plan?: string }) =>
+      request<{ data: { id: string; email: string; name: string | null; plan: string; storage_used_bytes: number; storage_limit_bytes: number; created_at: string } }>('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deleteUser: (userId: string) =>
+      request<{ message: string }>(`/admin/users/${userId}`, { method: 'DELETE' }),
+    listUserTokens: (userId: string) =>
+      request<{ data: Array<{ id: string; label: string; created_at: string; expires_at: string | null; last_used_at: string | null }> }>(
+        `/admin/users/${userId}/tokens`
+      ),
+    createUserToken: (userId: string, data?: { label?: string }) =>
+      request<{ data: { id: string; label: string; token: string; autoLoginUrl: string; expiresAt: string | null; createdAt: string } }>(
+        `/admin/users/${userId}/tokens`,
+        { method: 'POST', body: JSON.stringify(data || {}) }
+      ),
+    revokeUserToken: (userId: string, tokenId: string) =>
+      request<{ message: string }>(`/admin/users/${userId}/tokens/${tokenId}`, { method: 'DELETE' }),
   },
 };
 

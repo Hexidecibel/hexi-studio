@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export function Layout() {
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const location = useLocation();
 
   return (
@@ -21,6 +21,11 @@ export function Layout() {
           <Link to="/account" className={location.pathname === '/account' ? 'active' : ''}>
             Account
           </Link>
+          {isAdmin && (
+            <Link to="/admin/tenants" className={location.pathname === '/admin/tenants' ? 'active' : ''}>
+              Tenants
+            </Link>
+          )}
         </nav>
         <div className="header-right">
           <span className="user-email">{user?.email}</span>

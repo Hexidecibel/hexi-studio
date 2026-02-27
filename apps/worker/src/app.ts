@@ -9,6 +9,7 @@ import { mediaRoutes } from './routes/media';
 import { libraryRoutes } from './routes/library';
 import { publicRoutes } from './routes/public';
 import { cdnRoutes } from './routes/cdn';
+import { adminRoutes } from './routes/admin';
 
 export const app = new Hono<{ Bindings: Env; Variables: AdapterVariables }>();
 
@@ -49,6 +50,7 @@ app.use('/api/v1/cdn/*', cors({ origin: '*' }));
 
 // Mount routes
 app.route('/api/v1/auth', authRoutes);
+app.route('/api/v1/admin', adminRoutes);
 app.route('/api/v1/galleries', galleryRoutes);
 app.route('/api/v1/library', libraryRoutes);
 app.route('/api/v1/cdn', cdnRoutes);

@@ -11,6 +11,7 @@ import { Layout } from './components/Layout';
 import { AutoLoginPage } from './pages/AutoLoginPage';
 import { AccountPage } from './pages/AccountPage';
 import { LibraryPage } from './pages/LibraryPage';
+import { AdminTenantsPage } from './pages/AdminTenantsPage';
 
 export function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,6 +37,7 @@ export function App() {
         <Route path="/galleries/:id/settings" element={<GallerySettingsPage />} />
         <Route path="/galleries/:id/embed" element={<EmbedPage />} />
         <Route path="/galleries/:id/preview" element={<PreviewPage />} />
+        <Route path="/admin/tenants" element={<AdminTenantsPage />} />
       </Route>
     </Routes>
   );
