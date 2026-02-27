@@ -59,8 +59,8 @@ app.route('/api/v1/public', publicRoutes);
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// 404 fallback
-app.notFound((c) => c.json({ error: 'Not found' }, 404));
+// API 404 — non-API routes fall through to static serving in server.ts
+app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));
 
 // Error handler
 app.onError((err, c) => {

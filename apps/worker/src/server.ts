@@ -2,7 +2,19 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { existsSync } from 'fs';
 import { app } from './app';
+
+// Serve dashboard SPA in production (Docker builds copy dashboard dist → ./public)
+if (existsSync('./public')) {
+  app.use('*', serveStatic({ root: './public' }));
+  app.get('*', serveStatic({ root: './public', path: 'index.html' }));
+  console.log('Serving dashboard from ./public');
+}
+
+// Final 404 fallback
+app.notFound((c) => c.json({ error: 'Not found' }, 404));
 
 const port = parseInt(process.env.PORT || '4100');
 

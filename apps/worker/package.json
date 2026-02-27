@@ -10,7 +10,7 @@
     "db:migrate:local": "wrangler d1 execute hexi-db --local --file=./migrations/0001_initial.sql",
     "db:migrate:remote": "wrangler d1 execute hexi-db --remote --file=./migrations/0001_initial.sql",
     "dev:local": "tsx watch src/server.ts",
-    "build:local": "tsup src/server.ts --format esm --target node20 --external better-sqlite3 --external sharp",
+    "build:local": "tsup src/server.ts --format esm --target node20 --external better-sqlite3 --external sharp --external nodemailer",
     "start:local": "node dist/server.js",
     "clean": "rm -rf dist .wrangler"
   },
