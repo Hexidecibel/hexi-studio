@@ -89,7 +89,7 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
     return c.json({ error: 'Gallery not found' }, 404);
   }
 
-  const cdnBase = c.env.CDN_BASE_URL || '';
+  const cdnBase = c.env.CDN_BASE_URL || '/api/v1/cdn';
   const limit = 200;
 
   const [mediaResult, countResult] = await Promise.all([
@@ -192,7 +192,7 @@ publicRoutes.get('/galleries/:slug', async (c) => {
     return c.json({ error: 'Gallery not found' }, 404);
   }
 
-  const cdnBase = c.env.CDN_BASE_URL || '';
+  const cdnBase = c.env.CDN_BASE_URL || '/api/v1/cdn';
   const limit = 50;
 
   // Fetch first page of media
@@ -260,7 +260,7 @@ publicRoutes.get('/galleries/:slug/media', async (c) => {
   const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '50')));
   const offset = (page - 1) * limit;
 
-  const cdnBase = c.env.CDN_BASE_URL || '';
+  const cdnBase = c.env.CDN_BASE_URL || '/api/v1/cdn';
 
   const [mediaResult, countResult] = await Promise.all([
     c.get('db').prepare(
