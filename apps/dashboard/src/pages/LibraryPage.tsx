@@ -211,7 +211,7 @@ export function LibraryPage() {
               <button
                 className={`btn-secondary btn-sm ${!filterTag ? 'active' : ''}`}
                 onClick={() => setFilterTag('')}
-                style={!filterTag ? { background: '#2563eb', color: '#fff', borderColor: '#2563eb' } : {}}
+                style={!filterTag ? { background: '#7c5cfc', color: '#fff', borderColor: '#7c5cfc' } : {}}
               >
                 All
               </button>
@@ -220,7 +220,7 @@ export function LibraryPage() {
                   key={tag}
                   className={`btn-secondary btn-sm ${filterTag === tag ? 'active' : ''}`}
                   onClick={() => setFilterTag(filterTag === tag ? '' : tag)}
-                  style={filterTag === tag ? { background: '#2563eb', color: '#fff', borderColor: '#2563eb' } : {}}
+                  style={filterTag === tag ? { background: '#7c5cfc', color: '#fff', borderColor: '#7c5cfc' } : {}}
                 >
                   {tag}
                 </button>

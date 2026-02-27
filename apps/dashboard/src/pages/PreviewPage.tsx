@@ -77,7 +77,7 @@ export function PreviewPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '16px' }}>
         <h2>No media yet</h2>
-        <p style={{ color: '#6b7280' }}>Upload some photos or videos to see your gallery preview.</p>
+        <p style={{ color: '#7a7a9a' }}>Upload some photos or videos to see your gallery preview.</p>
         <button onClick={() => navigate(`/galleries/${id}`)} className="btn-primary">Go to Editor</button>
       </div>
     );
@@ -139,7 +139,7 @@ export function PreviewPage() {
         <button
           onClick={() => navigate(-1)}
           style={{
-            background: '#2563eb',
+            background: '#7c5cfc',
             border: 'none',
             color: '#fff',
             padding: '4px 12px',
