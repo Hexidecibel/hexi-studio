@@ -71,6 +71,28 @@ function buildHeaders(apiKey?: string): HeadersInit | undefined {
   return { 'X-API-Key': apiKey };
 }
 
+
+function resolveUrl(url: string, origin: string): string {
+  if (!url || !url.startsWith('/')) return url;
+  return origin + url;
+}
+
+function resolveMediaUrls(items: MediaItem[], apiBase: string): MediaItem[] {
+  try {
+    const origin = new URL(apiBase).origin;
+    return items.map(item => ({
+      ...item,
+      src: resolveUrl(item.src, origin),
+      thumbnail: item.thumbnail ? resolveUrl(item.thumbnail, origin) : item.thumbnail,
+      srcSet: item.srcSet ? item.srcSet.replace(/(^|\s)(\/\S+)/g, `$1${origin}$2`) : item.srcSet,
+      blurDataUrl: item.blurDataUrl ? resolveUrl(item.blurDataUrl, origin) : item.blurDataUrl,
+      poster: item.poster ? resolveUrl(item.poster, origin) : item.poster,
+    }));
+  } catch {
+    return items;
+  }
+}
+
 /**
  * Hook to connect to a Hexi Gallery Cloud gallery.
  * Fetches gallery config and media, handles pagination.
@@ -130,7 +152,7 @@ export function useHexiCloud(slug: string, options?: HexiCloudOptions): HexiClou
           theme: data.gallery.config.theme,
         });
         setName(data.gallery.name);
-        setItems(data.media.items);
+        setItems(resolveMediaUrls(data.media.items, apiBase));
         setHasMore(data.media.hasMore);
         setTotal(data.media.total);
         pageRef.current = 1;
@@ -152,7 +174,7 @@ export function useHexiCloud(slug: string, options?: HexiCloudOptions): HexiClou
         if (!response.ok) throw new Error('Failed to load more');
         const data: MediaPageResponse = await response.json();
 
-        setItems((prev) => [...prev, ...data.items]);
+        setItems((prev) => [...prev, ...resolveMediaUrls(data.items, apiBase)]);
         setHasMore(data.hasMore);
         setTotal(data.total);
         pageRef.current = nextPage;
