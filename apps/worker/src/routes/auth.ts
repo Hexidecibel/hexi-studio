@@ -8,7 +8,7 @@ import { generateToken, hashToken, generateId } from '../utils/crypto';
 import { isValidEmail } from '../utils/validation';
 import { sendEmail, buildMagicLinkEmail } from '../services/email';
 
-async function createSession(db: DatabaseAdapter, userId: string): Promise<{ token: string; expiresAt: string }> {
+export async function createSession(db: DatabaseAdapter, userId: string): Promise<{ token: string; expiresAt: string }> {
   const sessionToken = generateToken();
   const sessionHash = await hashToken(sessionToken);
   const sessionId = generateId();
@@ -116,6 +116,35 @@ authRoutes.get('/verify', async (c) => {
   const session = await createSession(c.get('db'), user.id);
 
   return c.json(session);
+});
+
+// GET /auth/storage-breakdown — Get storage usage breakdown (requires auth)
+authRoutes.get('/storage-breakdown', requireAuth, async (c) => {
+  const user = c.get('user');
+  const db = c.get('db');
+
+  const [galleryResult, libraryResult] = await Promise.all([
+    db.prepare(
+      'SELECT COUNT(*) as count, COALESCE(SUM(file_size), 0) as totalBytes FROM media WHERE user_id = ? AND deleted_at IS NULL'
+    ).bind(user.id).first<{ count: number; totalBytes: number }>(),
+    db.prepare(
+      'SELECT COUNT(*) as count, COALESCE(SUM(file_size), 0) as totalBytes FROM library_media WHERE user_id = ? AND deleted_at IS NULL'
+    ).bind(user.id).first<{ count: number; totalBytes: number }>(),
+  ]);
+
+  const gallery = { count: galleryResult?.count ?? 0, totalBytes: galleryResult?.totalBytes ?? 0 };
+  const library = { count: libraryResult?.count ?? 0, totalBytes: libraryResult?.totalBytes ?? 0 };
+
+  return c.json({
+    gallery,
+    library,
+    total: {
+      count: gallery.count + library.count,
+      totalBytes: gallery.totalBytes + library.totalBytes,
+    },
+    storageUsedBytes: user.storageUsedBytes,
+    storageLimitBytes: user.storageLimitBytes,
+  });
 });
 
 // POST /auth/logout — End session (requires auth)

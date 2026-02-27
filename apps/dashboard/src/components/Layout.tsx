@@ -2,11 +2,19 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export function Layout() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, isImpersonating, impersonatingEmail, stopAssuming } = useAuth();
   const location = useLocation();
 
   return (
     <div className="dashboard-layout">
+      {isImpersonating && (
+        <div className="impersonation-banner">
+          <span>Viewing as <strong>{impersonatingEmail}</strong></span>
+          <button onClick={stopAssuming} className="impersonation-stop-btn">
+            Stop Impersonating
+          </button>
+        </div>
+      )}
       <header className="dashboard-header">
         <div className="header-left">
           <Link to="/" className="logo">Hexi Gallery</Link>

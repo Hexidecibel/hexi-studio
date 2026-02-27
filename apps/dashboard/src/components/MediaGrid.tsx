@@ -1,5 +1,16 @@
 import { useState, useCallback, useRef, useEffect, type DragEvent, type ChangeEvent } from 'react';
 import { api, type MediaItem } from '../lib/api';
+import { useUploadQueue } from '../hooks/useUploadQueue';
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 interface MediaGridProps {
   galleryId: string;
@@ -9,10 +20,12 @@ interface MediaGridProps {
 }
 
 export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGridProps) {
-  const [uploading, setUploading] = useState<Map<string, number>>(new Map());
+  const { uploads, processFiles, clearError } = useUploadQueue();
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const isSelecting = selectedIds.size > 0;
 
   // Drag-and-drop reorder state
   const [localMedia, setLocalMedia] = useState<MediaItem[]>(media);
@@ -23,6 +36,12 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
   useEffect(() => {
     if (dragIndex === null) {
       setLocalMedia(media);
+      // Clear selections that no longer exist
+      setSelectedIds(prev => {
+        const mediaIds = new Set(media.map(m => m.id));
+        const next = new Set([...prev].filter(id => mediaIds.has(id)));
+        return next.size === prev.size ? prev : next;
+      });
     }
   }, [media, dragIndex]);
 
@@ -81,8 +100,42 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
     setOverIndex(null);
   }, []);
 
-  const uploadFile = useCallback(async (file: File) => {
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    if (selectedIds.size === localMedia.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(localMedia.map(m => m.id)));
+    }
+  }, [localMedia, selectedIds.size]);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} item${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
     try {
+      await Promise.all(
+        Array.from(selectedIds).map(id => api.media.delete(galleryId, id))
+      );
+      setSelectedIds(new Set());
+      onMediaChange();
+    } catch (err) {
+      console.error('Batch delete failed:', err);
+      onMediaChange(); // refresh to show what actually got deleted
+    }
+  }, [selectedIds, galleryId, onMediaChange]);
+
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    processFiles(Array.from(files), async (file, onProgress) => {
+      onProgress(10, 'getting-url');
+
       // 1. Get upload URL
       const { data: uploadInfo } = await api.media.getUploadUrl(galleryId, {
         filename: file.name,
@@ -90,12 +143,12 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
         fileSize: file.size,
       });
 
-      setUploading((prev) => new Map(prev).set(uploadInfo.mediaId, 0));
+      onProgress(50, 'uploading');
 
       // 2. Upload file
       await api.media.upload(galleryId, uploadInfo.mediaId, file);
 
-      setUploading((prev) => new Map(prev).set(uploadInfo.mediaId, 50));
+      onProgress(80, 'confirming');
 
       // 3. Get dimensions for images
       let width: number | undefined;
@@ -114,23 +167,10 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
         height,
         alt: file.name.replace(/\.[^.]+$/, ''),
       });
-
-      setUploading((prev) => {
-        const next = new Map(prev);
-        next.delete(uploadInfo.mediaId);
-        return next;
-      });
-
+    }, () => {
       onMediaChange();
-    } catch (err) {
-      console.error('Upload failed:', err);
-      setUploading(new Map());
-    }
-  }, [galleryId, onMediaChange]);
-
-  const handleFiles = useCallback((files: FileList | File[]) => {
-    Array.from(files).forEach(uploadFile);
-  }, [uploadFile]);
+    });
+  }, [galleryId, onMediaChange, processFiles]);
 
   const handleDrop = useCallback((e: DragEvent) => {
     e.preventDefault();
@@ -211,14 +251,47 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
       </div>
 
       {/* Upload progress */}
-      {uploading.size > 0 && (
-        <div className="upload-progress">
-          {Array.from(uploading.entries()).map(([id, _progress]) => (
-            <div key={id} className="upload-progress-item">
-              <div className="upload-progress-bar" />
-              <span>Uploading...</span>
+      {uploads.length > 0 && (
+        <div className="upload-progress-list">
+          {uploads.map(item => (
+            <div key={item.localId} className={`upload-progress-item ${item.status === 'error' ? 'upload-error' : ''}`}>
+              <div className="upload-progress-file-name">{item.fileName}</div>
+              <div className="upload-progress-track">
+                <div
+                  className="upload-progress-fill"
+                  style={{ width: `${item.progress}%` }}
+                />
+              </div>
+              <div className="upload-progress-status">
+                {item.status === 'error' ? (
+                  <span onClick={() => clearError(item.localId)} style={{cursor:'pointer'}}>&#10005; {item.error}</span>
+                ) : item.status === 'done' ? 'Done' :
+                  item.status === 'queued' ? 'Queued' :
+                  item.status === 'getting-url' ? 'Preparing...' :
+                  item.status === 'uploading' ? 'Uploading...' : 'Confirming...'}
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Batch actions */}
+      {localMedia.length > 0 && (
+        <div className="media-batch-bar">
+          <button onClick={selectAll} className="btn-secondary btn-sm">
+            {selectedIds.size === localMedia.length ? 'Deselect All' : 'Select All'}
+          </button>
+          {isSelecting && (
+            <>
+              <span className="text-muted">{selectedIds.size} selected</span>
+              <button onClick={() => setSelectedIds(new Set())} className="btn-secondary btn-sm">
+                Cancel
+              </button>
+              <button onClick={handleBatchDelete} className="btn-danger btn-sm">
+                Delete Selected
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -232,18 +305,39 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
                 'media-item' +
                 (dragIndex === index ? ' media-item-dragging' : '') +
                 (overIndex === index && dragIndex !== null && dragIndex < index ? ' media-item-drop-after' : '') +
-                (overIndex === index && dragIndex !== null && dragIndex > index ? ' media-item-drop-before' : '')
+                (overIndex === index && dragIndex !== null && dragIndex > index ? ' media-item-drop-before' : '') +
+                (selectedIds.has(item.id) ? ' media-item-selected' : '')
               }
-              draggable
-              onDragStart={(e) => handleReorderDragStart(e, index)}
-              onDragOver={(e) => handleReorderDragOver(e, index)}
-              onDragLeave={handleReorderDragLeave}
-              onDrop={(e) => handleReorderDrop(e, index)}
-              onDragEnd={handleReorderDragEnd}
+              draggable={!isSelecting}
+              onDragStart={(e) => !isSelecting && handleReorderDragStart(e, index)}
+              onDragOver={(e) => !isSelecting && handleReorderDragOver(e, index)}
+              onDragLeave={!isSelecting ? handleReorderDragLeave : undefined}
+              onDrop={(e) => !isSelecting && handleReorderDrop(e, index)}
+              onDragEnd={!isSelecting ? handleReorderDragEnd : undefined}
+              onClick={() => isSelecting && toggleSelect(item.id)}
             >
               <div className="media-item-preview">
+                {/* Selection checkbox */}
+                {(isSelecting || selectedIds.has(item.id)) && (
+                  <div
+                    className={`media-select-check ${selectedIds.has(item.id) ? 'checked' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
+                  >
+                    {selectedIds.has(item.id) ? '\u2713' : ''}
+                  </div>
+                )}
                 {item.media_type === 'video' ? (
-                  <div className="video-placeholder">Video</div>
+                  <div className="video-thumb-container">
+                    <video className="video-thumb" src={getMediaUrl(item)} preload="metadata" muted playsInline />
+                    <div className="video-overlay">
+                      <div className="video-play-icon">
+                        <svg viewBox="0 0 24 24"><polygon points="8,5 20,12 8,19" /></svg>
+                      </div>
+                    </div>
+                    {item.duration != null && (
+                      <div className="video-duration">{formatDuration(item.duration)}</div>
+                    )}
+                  </div>
                 ) : (
                   <img src={getMediaUrl(item)} alt={item.alt} loading="lazy" />
                 )}
@@ -272,7 +366,7 @@ export function MediaGrid({ galleryId, userId, media, onMediaChange }: MediaGrid
             </div>
           ))}
         </div>
-      ) : uploading.size === 0 ? (
+      ) : uploads.length === 0 ? (
         <div className="empty-state">
           <p>No media yet. Upload some files to get started.</p>
         </div>

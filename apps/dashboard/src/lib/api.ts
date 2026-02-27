@@ -28,11 +28,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const body = await response.json().catch(() => ({ error: 'Request failed' }));
     if (response.status === 401) {
       localStorage.removeItem('hexi_session_token');
+      localStorage.removeItem('hexi_admin_token');
+      localStorage.removeItem('hexi_impersonating');
       window.location.href = '/login';
     }
     throw new ApiError(response.status, body.error || 'Request failed');
   }
 
+  if (response.status === 204) return undefined as T;
   return response.json();
 }
 
@@ -68,6 +71,14 @@ export const api = {
         `/auth/auto-login-tokens/${id}`,
         { method: 'DELETE' }
       ),
+    storageBreakdown: () =>
+      request<{
+        gallery: { count: number; totalBytes: number };
+        library: { count: number; totalBytes: number };
+        total: { count: number; totalBytes: number };
+        storageUsedBytes: number;
+        storageLimitBytes: number;
+      }>('/auth/storage-breakdown'),
   },
 
   galleries: {
@@ -196,6 +207,25 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ message: string }>(`/library/${id}`, { method: 'DELETE' }),
+    reorder: (order: string[]) =>
+      request<{ message: string; count: number }>('/library/reorder', {
+        method: 'POST',
+        body: JSON.stringify({ order }),
+      }),
+  },
+
+  apiKeys: {
+    create: (label: string) =>
+      request<{ id: string; key: string; label: string; created_at: string }>('/api-keys', {
+        method: 'POST',
+        body: JSON.stringify({ label }),
+      }),
+    list: () =>
+      request<{ apiKeys: Array<{ id: string; label: string; last_used_at: string | null; created_at: string }> }>(
+        '/api-keys'
+      ),
+    delete: (id: string) =>
+      request<void>(`/api-keys/${id}`, { method: 'DELETE' }),
   },
 
   admin: {
@@ -221,6 +251,11 @@ export const api = {
       ),
     revokeUserToken: (userId: string, tokenId: string) =>
       request<{ message: string }>(`/admin/users/${userId}/tokens/${tokenId}`, { method: 'DELETE' }),
+    assumeUser: (userId: string) =>
+      request<{ token: string; expiresAt: string; assumedUser: { id: string; email: string } }>(
+        `/admin/users/${userId}/assume`,
+        { method: 'POST' }
+      ),
   },
 };
 
@@ -274,6 +309,7 @@ export interface LibraryItem {
   title: string | null;
   description: string | null;
   tags: string;
+  sort_order: number;
   status: string;
   blur_data_url: string | null;
   metadata: string;

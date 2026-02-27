@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
 import { generateToken, hashToken, generateId } from '../utils/crypto';
 import { isValidEmail } from '../utils/validation';
+import { createSession } from './auth';
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: AdapterVariables & AuthVariables }>();
 
@@ -161,4 +162,25 @@ adminRoutes.delete('/users/:userId/tokens/:tokenId', async (c) => {
   }
 
   return c.json({ message: 'Token revoked' });
+});
+
+// POST /admin/users/:userId/assume — Impersonate a user by creating a session as them
+adminRoutes.post('/users/:userId/assume', async (c) => {
+  const userId = c.req.param('userId');
+
+  const targetUser = await c.get('db').prepare(
+    'SELECT id, email FROM users WHERE id = ? AND deleted_at IS NULL'
+  ).bind(userId).first<{ id: string; email: string }>();
+
+  if (!targetUser) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  const session = await createSession(c.get('db'), targetUser.id);
+
+  return c.json({
+    token: session.token,
+    expiresAt: session.expiresAt,
+    assumedUser: { id: targetUser.id, email: targetUser.email },
+  });
 });

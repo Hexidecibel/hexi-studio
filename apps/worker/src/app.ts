@@ -10,6 +10,7 @@ import { libraryRoutes } from './routes/library';
 import { publicRoutes } from './routes/public';
 import { cdnRoutes } from './routes/cdn';
 import { adminRoutes } from './routes/admin';
+import { apiKeyRoutes } from './routes/api-keys';
 
 export const app = new Hono<{ Bindings: Env; Variables: AdapterVariables }>();
 
@@ -37,7 +38,7 @@ app.use('/api/v1/*', async (c, next) => {
   const corsMiddleware = cors({
     origin: c.env.CORS_ORIGIN || '*',
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true,
     maxAge: 86400,
   });
@@ -45,12 +46,13 @@ app.use('/api/v1/*', async (c, next) => {
 });
 
 // Public CORS (any origin)
-app.use('/api/v1/public/*', cors({ origin: '*' }));
+app.use('/api/v1/public/*', cors({ origin: '*', allowHeaders: ['Content-Type', 'X-API-Key'] }));
 app.use('/api/v1/cdn/*', cors({ origin: '*' }));
 
 // Mount routes
 app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/admin', adminRoutes);
+app.route('/api/v1/api-keys', apiKeyRoutes);
 app.route('/api/v1/galleries', galleryRoutes);
 app.route('/api/v1/library', libraryRoutes);
 app.route('/api/v1/cdn', cdnRoutes);

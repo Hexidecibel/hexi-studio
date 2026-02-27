@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 
@@ -22,7 +22,8 @@ interface TenantToken {
 }
 
 export function AdminTenantsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, assumeUser } = useAuth();
+  const navigate = useNavigate();
 
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -267,6 +268,15 @@ export function AdminTenantsPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          assumeUser(tenant.id).then(() => navigate('/'));
+                        }}
+                        className="btn-secondary btn-sm"
+                      >
+                        Assume
+                      </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(tenant.id, tenant.email); }}
                         className="btn-danger btn-sm"
