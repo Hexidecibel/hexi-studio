@@ -27,6 +27,22 @@ export interface Env {
   S3_ACCESS_KEY_ID?: string;
   S3_SECRET_ACCESS_KEY?: string;
   S3_FORCE_PATH_STYLE?: string;
+  // OAuth - Google
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_REDIRECT_URI?: string;
+  // OAuth - Apple
+  APPLE_CLIENT_ID?: string;
+  APPLE_TEAM_ID?: string;
+  APPLE_KEY_ID?: string;
+  APPLE_PRIVATE_KEY?: string;
+  APPLE_REDIRECT_URI?: string;
+  // Dashboard URL for OAuth redirects
+  DASHBOARD_URL?: string;
+  // 4sure OIDC
+  FOURSURE_CLIENT_ID?: string;
+  FOURSURE_CLIENT_SECRET?: string;
+  FOURSURE_ISSUER?: string;
 }
 
 export interface AuthUser {

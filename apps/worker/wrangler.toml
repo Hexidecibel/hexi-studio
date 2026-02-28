@@ -27,3 +27,14 @@ bucket_name = "hexi-media"
 
 # SMTP password (set as a secret, not a var):
 #   npx wrangler secret put SMTP_PASS
+
+# OAuth secrets (set via `wrangler secret put`):
+# GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_SECRET
+# GOOGLE_REDIRECT_URI
+# APPLE_CLIENT_ID
+# APPLE_TEAM_ID
+# APPLE_KEY_ID
+# APPLE_PRIVATE_KEY
+# APPLE_REDIRECT_URI
+# DASHBOARD_URL

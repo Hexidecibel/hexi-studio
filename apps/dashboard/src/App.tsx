@@ -9,6 +9,7 @@ import { EmbedPage } from './pages/EmbedPage';
 import { PreviewPage } from './pages/PreviewPage';
 import { Layout } from './components/Layout';
 import { AutoLoginPage } from './pages/AutoLoginPage';
+import { OAuthCompletePage } from './pages/OAuthCompletePage';
 import { AccountPage } from './pages/AccountPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { AdminTenantsPage } from './pages/AdminTenantsPage';
@@ -29,6 +30,7 @@ export function App() {
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
       <Route path="/auth/verify" element={<VerifyPage />} />
       <Route path="/auth/auto" element={<AutoLoginPage />} />
+      <Route path="/auth/oauth-complete" element={<OAuthCompletePage />} />
       <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
         <Route path="/" element={<GalleryListPage />} />
         <Route path="/account" element={<AccountPage />} />

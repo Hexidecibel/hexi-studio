@@ -11,6 +11,8 @@ import { publicRoutes } from './routes/public';
 import { cdnRoutes } from './routes/cdn';
 import { adminRoutes } from './routes/admin';
 import { apiKeyRoutes } from './routes/api-keys';
+import oauth from './routes/oauth';
+import foursure from './routes/foursure';
 
 export const app = new Hono<{ Bindings: Env; Variables: AdapterVariables }>();
 
@@ -62,6 +64,8 @@ app.use('/api/v1/cdn/*', cors({ origin: '*' }));
 
 // Mount routes
 app.route('/api/v1/auth', authRoutes);
+app.route('/api/v1/auth/oauth', oauth);
+app.route('/api/v1/auth/4sure', foursure);
 app.route('/api/v1/admin', adminRoutes);
 app.route('/api/v1/api-keys', apiKeyRoutes);
 app.route('/api/v1/galleries', galleryRoutes);
