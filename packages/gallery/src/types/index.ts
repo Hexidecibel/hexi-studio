@@ -113,6 +113,8 @@ export interface GalleryProps {
   enableSlideshow?: boolean;
   /** Slideshow interval in milliseconds (default 5000) */
   slideshowInterval?: number;
+  /** Randomize image order on each load */
+  shuffle?: boolean;
 }
 
 /**
@@ -137,6 +139,8 @@ export interface ConfiguratorState {
   layout: LayoutOptions;
   /** Theme overrides */
   theme?: Partial<ThemeTokens>;
+  /** Whether to randomize image order */
+  shuffle?: boolean;
 }
 
 /**

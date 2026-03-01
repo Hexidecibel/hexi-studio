@@ -6,6 +6,7 @@ type ConfigAction =
   | { type: 'SET_LAYOUT'; payload: Partial<LayoutOptions> }
   | { type: 'SET_IMAGES'; payload: ImageItem[] }
   | { type: 'SET_THEME'; payload: Partial<ThemeTokens> }
+  | { type: 'SET_SHUFFLE'; payload: boolean }
   | { type: 'RESET' }
   | { type: 'RESTORE'; payload: ConfiguratorState };
 
@@ -13,6 +14,7 @@ const initialState: ConfiguratorState = {
   images: [],
   layout: { ...DEFAULT_LAYOUT },
   theme: undefined,
+  shuffle: false,
 };
 
 function reducer(state: ConfiguratorState, action: ConfigAction): ConfiguratorState {
@@ -23,6 +25,8 @@ function reducer(state: ConfiguratorState, action: ConfigAction): ConfiguratorSt
       return { ...state, images: action.payload };
     case 'SET_THEME':
       return { ...state, theme: { ...state.theme, ...action.payload } };
+    case 'SET_SHUFFLE':
+      return { ...state, shuffle: action.payload };
     case 'RESET':
       return { ...initialState };
     case 'RESTORE':
@@ -64,6 +68,10 @@ function generateCodeString(state: ConfiguratorState): string {
 
   props.push('  enableLightbox');
 
+  if (state.shuffle) {
+    props.push('  shuffle');
+  }
+
   const imagesProp = 'images={images}';
 
   return `<Gallery\n  ${imagesProp}\n${props.join('\n')}\n/>`;
@@ -91,6 +99,10 @@ export function useConfigurator(initialOverride?: Partial<ConfiguratorState>) {
     dispatch({ type: 'SET_THEME', payload: theme });
   }, []);
 
+  const setShuffle = useCallback((shuffle: boolean) => {
+    dispatch({ type: 'SET_SHUFFLE', payload: shuffle });
+  }, []);
+
   const reset = useCallback(() => {
     dispatch({ type: 'RESET' });
   }, []);
@@ -107,6 +119,7 @@ export function useConfigurator(initialOverride?: Partial<ConfiguratorState>) {
     setLayoutType,
     setImages,
     setTheme,
+    setShuffle,
     reset,
     restore,
     exportCode,

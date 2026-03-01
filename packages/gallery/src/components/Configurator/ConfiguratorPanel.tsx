@@ -17,6 +17,8 @@ interface ConfiguratorPanelProps {
   children?: React.ReactNode;
   previewWidth?: number;
   onPreviewWidthChange?: (width: number) => void;
+  shuffle?: boolean;
+  onShuffleChange?: (shuffle: boolean) => void;
 }
 
 export function ConfiguratorPanel({
@@ -29,6 +31,8 @@ export function ConfiguratorPanel({
   children,
   previewWidth,
   onPreviewWidthChange,
+  shuffle,
+  onShuffleChange,
 }: ConfiguratorPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -69,6 +73,20 @@ export function ConfiguratorPanel({
               images={state.images}
               onImagesChange={onImagesChange}
             />
+
+            {onShuffleChange && (
+              <fieldset className={styles.displayFieldset}>
+                <legend className={styles.displayLegend}>Display</legend>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={shuffle ?? false}
+                    onChange={(e) => onShuffleChange(e.target.checked)}
+                  />
+                  Shuffle images
+                </label>
+              </fieldset>
+            )}
 
             {onPreviewWidthChange && (
               <ResponsivePreview

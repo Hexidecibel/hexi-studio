@@ -11,6 +11,7 @@ interface GalleryConfig {
   gap?: number;
   rowHeight?: number;
   enableLightbox?: boolean;
+  shuffle?: boolean;
   theme?: 'light' | 'dark' | 'auto';
 }
 
@@ -27,6 +28,7 @@ export function GallerySettingsPage() {
   const [gap, setGap] = useState(8);
   const [rowHeight, setRowHeight] = useState(240);
   const [enableLightbox, setEnableLightbox] = useState(true);
+  const [shuffle, setShuffle] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('auto');
   const [published, setPublished] = useState(false);
 
@@ -43,6 +45,7 @@ export function GallerySettingsPage() {
         setGap(config.gap ?? 8);
         setRowHeight(config.rowHeight ?? 240);
         setEnableLightbox(config.enableLightbox ?? true);
+        setShuffle(config.shuffle ?? false);
         setTheme(config.theme || 'auto');
         setPublished(!!g.published);
       })
@@ -60,6 +63,7 @@ export function GallerySettingsPage() {
         gap,
         rowHeight,
         enableLightbox,
+        shuffle,
         theme,
       };
       const result = await api.galleries.update(id, { config, published });
@@ -173,6 +177,15 @@ export function GallerySettingsPage() {
             />
             <span>Enable Lightbox</span>
             <span className="field-hint">Allow users to click images for a fullscreen view</span>
+          </label>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={shuffle}
+              onChange={(e) => setShuffle(e.target.checked)}
+            />
+            <span>Shuffle Images</span>
+            <span className="field-hint">Randomize the display order of images on each page load</span>
           </label>
           <label className="field">
             <span>Theme</span>

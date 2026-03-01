@@ -20,6 +20,7 @@ export interface GalleryConfig {
   gap?: number;
   rowHeight?: number;
   enableLightbox?: boolean;
+  shuffle?: boolean;
   theme?: 'light' | 'dark' | 'auto';
 }
 

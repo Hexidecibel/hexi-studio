@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { GalleryProps, ImageItem } from '../../types';
 import { DEFAULT_LAYOUT } from '../../types';
 import { useLightbox } from '../../hooks/useLightbox';
@@ -23,9 +23,21 @@ export function Gallery({
   enableDownload,
   enableSlideshow,
   slideshowInterval,
+  shuffle,
 }: GalleryProps) {
   const resolvedLayout = { ...DEFAULT_LAYOUT, ...layout };
-  const lightbox = useLightbox({ images, slideshowInterval });
+
+  const displayImages = useMemo(() => {
+    if (!shuffle) return images;
+    const shuffled = [...images];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }, [images, shuffle]);
+
+  const lightbox = useLightbox({ images: displayImages, slideshowInterval });
 
   const handleImageClick = useCallback(
     (image: ImageItem, index: number) => {
@@ -48,7 +60,7 @@ export function Gallery({
   }
 
   const layoutProps = {
-    images,
+    images: displayImages,
     layout: resolvedLayout,
     onImageClick: onImageClick || enableLightbox ? handleImageClick : undefined,
     loading,
@@ -70,7 +82,7 @@ export function Gallery({
 
       {enableLightbox && (
         <Lightbox
-          images={images}
+          images={displayImages}
           currentIndex={lightbox.currentIndex}
           isOpen={lightbox.isOpen}
           hasNext={lightbox.hasNext}
