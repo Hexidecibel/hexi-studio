@@ -61,7 +61,7 @@ export function isVideoItem(item: MediaItem): boolean {
 /**
  * Available layout types
  */
-export type LayoutType = 'grid' | 'masonry' | 'justified';
+export type LayoutType = 'grid' | 'masonry' | 'justified' | 'showcase';
 
 /**
  * Configuration options for gallery layout
@@ -77,6 +77,8 @@ export interface LayoutOptions {
   rowHeight?: number;
   /** Maximum row height for justified layout */
   maxRowHeight?: number;
+  /** Thumbnail strip height for showcase layout */
+  thumbnailHeight?: number;
 }
 
 /**

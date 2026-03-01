@@ -5,6 +5,7 @@ import { useLightbox } from '../../hooks/useLightbox';
 import { GridLayout } from './layouts/GridLayout';
 import { MasonryLayout } from './layouts/MasonryLayout';
 import { JustifiedLayout } from './layouts/JustifiedLayout';
+import { ShowcaseLayout } from './layouts/ShowcaseLayout';
 import { Lightbox } from './Lightbox';
 import styles from './Gallery.module.css';
 
@@ -61,6 +62,8 @@ export function Gallery({
         <MasonryLayout {...layoutProps} />
       ) : resolvedLayout.type === 'justified' ? (
         <JustifiedLayout {...layoutProps} />
+      ) : resolvedLayout.type === 'showcase' ? (
+        <ShowcaseLayout {...layoutProps} />
       ) : (
         <GridLayout {...layoutProps} />
       )}

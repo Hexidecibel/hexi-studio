@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api, type Gallery } from '../lib/api';
 
-type LayoutType = 'grid' | 'masonry' | 'justified';
+type LayoutType = 'grid' | 'masonry' | 'justified' | 'showcase';
 
 interface GalleryConfig {
   [key: string]: unknown;
@@ -113,7 +113,7 @@ export function GallerySettingsPage() {
           <label className="field">
             <span>Layout Type</span>
             <div className="layout-picker">
-              {(['grid', 'masonry', 'justified'] as LayoutType[]).map((l) => (
+              {(['grid', 'masonry', 'justified', 'showcase'] as LayoutType[]).map((l) => (
                 <button
                   key={l}
                   className={`layout-option ${layout === l ? 'active' : ''}`}

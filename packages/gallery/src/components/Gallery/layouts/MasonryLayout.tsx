@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import type { ImageItem, LayoutOptions } from '../../../types';
 import { GalleryImage } from '../GalleryImage';
 import { useVirtualization } from '../../../hooks/useVirtualization';
+import { useContainerWidth } from '../../../hooks/useContainerWidth';
 import styles from './MasonryLayout.module.css';
 
 export interface MasonryLayoutProps {
@@ -11,6 +12,15 @@ export interface MasonryLayoutProps {
   loading?: 'lazy' | 'eager';
   virtualize?: boolean | number;
   onImageLoad?: () => void;
+}
+
+function getMasonryColumnCount(containerWidth: number, explicitColumns: number | 'auto' | undefined): number {
+  if (explicitColumns && explicitColumns !== 'auto') return explicitColumns;
+  if (containerWidth < 400) return 1;
+  if (containerWidth < 640) return 2;
+  if (containerWidth < 1024) return 3;
+  if (containerWidth < 1280) return 4;
+  return 5;
 }
 
 function distributeIntoColumns(
@@ -25,7 +35,7 @@ function distributeIntoColumns(
     columns[shortestIndex].push(image);
     const aspectRatio = image.width && image.height
       ? image.height / image.width
-      : 1;
+      : 0.75;
     columnHeights[shortestIndex] += aspectRatio;
   });
 
@@ -41,8 +51,18 @@ export function MasonryLayout({
   onImageLoad,
 }: MasonryLayoutProps) {
   const gap = typeof layout.gap === 'number' ? `${layout.gap}px` : layout.gap || '16px';
-  const columnCount = layout.columns === 'auto' ? 3 : layout.columns || 3;
+  const { ref: widthRef, width: containerWidth } = useContainerWidth();
+  const columnCount = getMasonryColumnCount(containerWidth, layout.columns);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const setRefs = (node: HTMLDivElement | null) => {
+    (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    (widthRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  };
+
+  if (images.length === 0) {
+    return <div ref={setRefs} className={`${styles.masonry} gallery-masonry`} />;
+  }
 
   const columns = useMemo(
     () => distributeIntoColumns(images, columnCount),
@@ -76,7 +96,7 @@ export function MasonryLayout({
     : maxColumnLength - 1;
 
   return (
-    <div ref={containerRef} className={`${styles.masonry} gallery-masonry`} style={gridStyle}>
+    <div ref={setRefs} className={`${styles.masonry} gallery-masonry`} style={gridStyle}>
       {columns.map((column, colIndex) => (
         <div key={colIndex} className={styles.column} style={{ gap }}>
           {column.map((image, rowInCol) => {
@@ -84,7 +104,7 @@ export function MasonryLayout({
               // Render a spacer to preserve layout height
               const aspectRatio = image.width && image.height
                 ? image.height / image.width
-                : 1;
+                : 0.75;
               return (
                 <div
                   key={image.id}

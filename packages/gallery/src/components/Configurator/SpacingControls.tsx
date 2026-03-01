@@ -29,31 +29,33 @@ export function SpacingControls({ layout, onChange }: SpacingControlsProps) {
         />
       </div>
 
-      <div className={styles.control}>
-        <label className={styles.label} htmlFor="columns-input">
-          Columns
-        </label>
-        <div className={styles.columnsRow}>
-          <input
-            id="columns-input"
-            type="number"
-            min="1"
-            max="12"
-            value={columns}
-            placeholder="auto"
-            onChange={(e) =>
-              onChange({ columns: e.target.value ? Number(e.target.value) : 'auto' })
-            }
-            className={styles.numberInput}
-          />
-          <button
-            className={`${styles.autoButton} ${layout.columns === 'auto' ? styles.active : ''}`}
-            onClick={() => onChange({ columns: 'auto' })}
-          >
-            Auto
-          </button>
+      {layout.type !== 'showcase' && (
+        <div className={styles.control}>
+          <label className={styles.label} htmlFor="columns-input">
+            Columns
+          </label>
+          <div className={styles.columnsRow}>
+            <input
+              id="columns-input"
+              type="number"
+              min="1"
+              max="12"
+              value={columns}
+              placeholder="auto"
+              onChange={(e) =>
+                onChange({ columns: e.target.value ? Number(e.target.value) : 'auto' })
+              }
+              className={styles.numberInput}
+            />
+            <button
+              className={`${styles.autoButton} ${layout.columns === 'auto' ? styles.active : ''}`}
+              onClick={() => onChange({ columns: 'auto' })}
+            >
+              Auto
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {layout.type === 'justified' && (
         <div className={styles.control}>
@@ -67,6 +69,23 @@ export function SpacingControls({ layout, onChange }: SpacingControlsProps) {
             max="400"
             value={layout.rowHeight || 240}
             onChange={(e) => onChange({ rowHeight: Number(e.target.value) })}
+            className={styles.slider}
+          />
+        </div>
+      )}
+
+      {layout.type === 'showcase' && (
+        <div className={styles.control}>
+          <label className={styles.label} htmlFor="thumbheight-slider">
+            Thumbnail Height: {layout.thumbnailHeight || 80}px
+          </label>
+          <input
+            id="thumbheight-slider"
+            type="range"
+            min="48"
+            max="120"
+            value={layout.thumbnailHeight || 80}
+            onChange={(e) => onChange({ thumbnailHeight: Number(e.target.value) })}
             className={styles.slider}
           />
         </div>

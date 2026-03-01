@@ -50,6 +50,9 @@ function generateCodeString(state: ConfiguratorState): string {
     if (state.layout.type === 'justified' && state.layout.rowHeight) {
       extras.push(`rowHeight: ${state.layout.rowHeight}`);
     }
+    if (state.layout.type === 'showcase' && state.layout.thumbnailHeight) {
+      extras.push(`thumbnailHeight: ${state.layout.thumbnailHeight}`);
+    }
 
     if (extras.length > 0) {
       props[props.length - 1] += `, ${extras.join(', ')}`;

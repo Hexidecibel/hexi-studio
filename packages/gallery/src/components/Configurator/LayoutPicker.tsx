@@ -22,6 +22,11 @@ const layouts: { type: LayoutType; label: string; icon: string }[] = [
     label: 'Justified',
     icon: 'M3 3h18v5H3V3zm0 8h10v5H3v-5zm13 0h5v5h-5v-5zM3 19h7v2H3v-2zm10 0h8v2h-8v-2z',
   },
+  {
+    type: 'showcase',
+    label: 'Showcase',
+    icon: 'M3 3h18v11H3V3zm0 14h5v4H3v-4zm7 0h5v4h-5v-4zm7 0h5v4h-5v-4z',
+  },
 ];
 
 export function LayoutPicker({ value, onChange }: LayoutPickerProps) {
