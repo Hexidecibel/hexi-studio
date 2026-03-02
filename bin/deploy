@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -e
+
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+COMPOSE_DIR="/mnt/hexinas/apps/hexi-gallery"
+
+source ~/.nvm/nvm.sh 2>/dev/null || true
+
+echo "=== Hexi Gallery Deploy ==="
+echo ""
+
+# Step 1: Build all packages
+echo "[1/3] Building packages..."
+cd "$DIR"
+npm run build
+echo ""
+
+# Step 2: Docker build + restart
+echo "[2/3] Building Docker image and restarting..."
+cd "$COMPOSE_DIR"
+docker compose build
+docker compose up -d
+echo ""
+
+# Step 3: Wait for healthy container
+echo "[3/3] Waiting for container to start..."
+sleep 5
+docker compose logs --tail=20 hexi-gallery
+echo ""
+echo "Deploy complete."

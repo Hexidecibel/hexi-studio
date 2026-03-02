@@ -76,6 +76,7 @@ async function generateAppleClientSecret(
 
   // Import the PKCS8 private key
   const pemBody = privateKey
+    .replace(/\\n/g, '\n')
     .replace(/-----BEGIN PRIVATE KEY-----/g, '')
     .replace(/-----END PRIVATE KEY-----/g, '')
     .replace(/\s/g, '');
