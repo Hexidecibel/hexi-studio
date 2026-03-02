@@ -85,9 +85,25 @@ export function LoginPage() {
             <div className="oauth-buttons">
               {foursureEnabled && (
                 <a href="/api/v1/auth/4sure" className="btn-oauth">
-                  <svg className="oauth-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  <svg className="oauth-icon" viewBox="0 0 512 512" width="20" height="20">
+                    <defs>
+                      <linearGradient id="fs-bgGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#0A1628"/>
+                        <stop offset="50%" stopColor="#0D2137"/>
+                        <stop offset="100%" stopColor="#00B4D8"/>
+                      </linearGradient>
+                      <linearGradient id="fs-fourGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#FFFFFF"/>
+                        <stop offset="100%" stopColor="#90E0EF"/>
+                      </linearGradient>
+                      <linearGradient id="fs-sureGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#00B4D8"/>
+                        <stop offset="100%" stopColor="#48CAE4"/>
+                      </linearGradient>
+                    </defs>
+                    <circle cx="256" cy="256" r="248" fill="url(#fs-bgGrad)"/>
+                    <text x="256" y="272" textAnchor="middle" dominantBaseline="auto" fontFamily="'Inter', 'SF Pro Display', system-ui, sans-serif" fontWeight="800" fontSize="260" fill="url(#fs-fourGrad)" letterSpacing="-8">4</text>
+                    <text x="256" y="368" textAnchor="middle" dominantBaseline="auto" fontFamily="'Inter', 'SF Pro Display', system-ui, sans-serif" fontWeight="600" fontSize="100" fill="url(#fs-sureGrad)" letterSpacing="12">sure</text>
                   </svg>
                   Sign in with 4sure
                 </a>
