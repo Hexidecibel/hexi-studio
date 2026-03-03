@@ -3,11 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
+# For production, set sensitive vars via `wrangler secret put` or environment variables.
+# See .env.local.example for the full list of configurable values.
 [vars]
 ENVIRONMENT = "development"
 CORS_ORIGIN = "*"
 CDN_BASE_URL = "/api/v1/cdn"
-MAGIC_LINK_BASE_URL = "http://localhost:5174"
+MAGIC_LINK_BASE_URL = "https://your-domain.com"
 ADMIN_EMAIL = "admin@example.com"
 SMTP_HOST = "smtp.example.com"
 SMTP_PORT = "587"

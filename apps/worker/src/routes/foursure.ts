@@ -53,18 +53,18 @@ async function generatePKCE(): Promise<{ verifier: string; challenge: string }> 
 // GET /config
 foursure.get('/config', (c) => {
   return c.json({
-    enabled: !!(c.env.FOURSURE_CLIENT_ID && c.env.FOURSURE_CLIENT_SECRET),
+    enabled: !!(c.env.FOURSURE_CLIENT_ID && c.env.FOURSURE_CLIENT_SECRET && c.env.FOURSURE_ISSUER),
   });
 });
 
 // GET / — initiate OIDC flow
 foursure.get('/', async (c) => {
-  if (!c.env.FOURSURE_CLIENT_ID || !c.env.FOURSURE_CLIENT_SECRET) {
+  if (!c.env.FOURSURE_CLIENT_ID || !c.env.FOURSURE_CLIENT_SECRET || !c.env.FOURSURE_ISSUER) {
     return c.json({ error: '4sure not configured' }, 400);
   }
 
   const db = c.get('db');
-  const issuer = c.env.FOURSURE_ISSUER || 'https://4sure.example.com';
+  const issuer = c.env.FOURSURE_ISSUER;
 
   const state = generateToken();
   const { verifier, challenge } = await generatePKCE();
@@ -96,7 +96,11 @@ foursure.get('/callback', async (c) => {
   const db = c.get('db');
   const { code, state, error } = c.req.query();
   const dashboardUrl = c.env.DASHBOARD_URL || new URL(c.req.url).origin;
-  const issuer = c.env.FOURSURE_ISSUER || 'https://4sure.example.com';
+  const issuer = c.env.FOURSURE_ISSUER;
+
+  if (!issuer) {
+    return c.redirect(`${dashboardUrl}/auth/oauth-complete?error=4sure_not_configured`);
+  }
 
   if (error) {
     return c.redirect(`${dashboardUrl}/auth/oauth-complete?error=${encodeURIComponent(error)}`);
