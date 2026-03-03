@@ -33,7 +33,7 @@ async function findOrCreateOAuthUser(
   if (!user) {
     await db.prepare(
       'INSERT INTO users (id, email, storage_limit_bytes, created_at) VALUES (?, ?, ?, ?)'
-    ).bind(userId, email, 1073741824, new Date().toISOString()).run();
+    ).bind(userId, email, 20971520, new Date().toISOString()).run();
   }
 
   // Link OAuth account to user

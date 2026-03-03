@@ -60,8 +60,8 @@ export function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Sign in to Hexi Gallery</h1>
-        <p>Enter your email to receive a sign-in link.</p>
+        <h1>Sign in or create an account</h1>
+        <p>Enter your email to receive a sign-in link. If you're new, we'll set up your account automatically.</p>
         <form onSubmit={handleSubmit}>
           <input
             type="email"

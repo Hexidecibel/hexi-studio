@@ -35,13 +35,18 @@ authRoutes.post('/magic-link', async (c) => {
     return c.json({ error: 'Valid email is required' }, 400);
   }
 
-  // Only allow existing users to log in
-  const existingUser = await c.get('db').prepare(
+  // Find existing user or auto-create a new one
+  let existingUser = await c.get('db').prepare(
     `SELECT id FROM users WHERE email = ? AND deleted_at IS NULL`
   ).bind(email).first<{ id: string }>();
 
   if (!existingUser) {
-    return c.json({ error: 'Account not found. Contact your administrator.' }, 403);
+    const newUserId = generateId();
+    const now = new Date().toISOString();
+    await c.get('db').prepare(
+      `INSERT INTO users (id, email, plan, storage_used_bytes, storage_limit_bytes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(newUserId, email, 'free', 0, 20971520, now, now).run();
+    existingUser = { id: newUserId };
   }
 
   // Generate magic link token
@@ -69,8 +74,7 @@ authRoutes.post('/magic-link', async (c) => {
     html: emailHtml,
   });
 
-  // Always return success (don't leak whether email exists)
-  return c.json({ message: 'If an account exists, a magic link has been sent.' });
+  return c.json({ message: 'A magic link has been sent to your email.' });
 });
 
 // GET /auth/verify — Verify magic link token and create session
@@ -103,13 +107,13 @@ authRoutes.get('/verify', async (c) => {
     .bind(magicLink.id)
     .run();
 
-  // Look up existing user — only pre-created accounts can log in
+  // Look up user (should always exist — created during magic-link request)
   const user = await c.get('db').prepare(
     `SELECT id FROM users WHERE email = ? AND deleted_at IS NULL`
   ).bind(email).first<{ id: string }>();
 
   if (!user) {
-    return c.json({ error: 'Account not found. Contact your administrator.' }, 403);
+    return c.json({ error: 'Account not found' }, 403);
   }
 
   // Create session (30 day expiry)
