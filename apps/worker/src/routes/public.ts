@@ -24,6 +24,7 @@ interface PublicMediaItem {
   description?: string;
   poster?: string;
   duration?: number;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -50,6 +51,15 @@ function toPublicMediaItem(
   if (row.title) item.title = row.title as string;
   if (row.description) item.description = row.description as string;
   if (row.blur_data_url) item.blurDataUrl = row.blur_data_url as string;
+
+  if (row.metadata) {
+    try {
+      const parsed = typeof row.metadata === 'string' ? JSON.parse(row.metadata as string) : row.metadata;
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        item.metadata = parsed as Record<string, unknown>;
+      }
+    } catch {}
+  }
 
   if (mediaType === 'image') {
     // Thumbnail
@@ -96,7 +106,7 @@ publicRoutes.get('/preview/galleries/:id', requireAuth, async (c) => {
   const [mediaResult, countResult] = await Promise.all([
     c.get('db').prepare(
       `SELECT id, media_type, width, height, alt, title, description, duration,
-              poster_r2_key, blur_data_url, sort_order
+              poster_r2_key, blur_data_url, sort_order, metadata
        FROM media
        WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL
        ORDER BY sort_order ASC, created_at ASC
@@ -139,7 +149,7 @@ publicRoutes.get('/media/:id', requireApiKey, async (c) => {
   const { userId } = c.get('apiTenant');
 
   const item = await c.get('db').prepare(
-    "SELECT id, user_id, width, height, alt, title, description, media_type, content_type FROM library_media WHERE id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL"
+    "SELECT id, user_id, width, height, alt, title, description, media_type, content_type, metadata FROM library_media WHERE id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL"
   ).bind(id, userId).first();
 
   if (!item) {
@@ -202,7 +212,7 @@ publicRoutes.get('/galleries/:slug', requireApiKey, async (c) => {
   const [mediaResult, countResult] = await Promise.all([
     c.get('db').prepare(
       `SELECT id, media_type, width, height, alt, title, description, duration,
-              poster_r2_key, blur_data_url, sort_order
+              poster_r2_key, blur_data_url, sort_order, metadata
        FROM media
        WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL
        ORDER BY sort_order ASC, created_at ASC
@@ -269,7 +279,7 @@ publicRoutes.get('/galleries/:slug/media', requireApiKey, async (c) => {
   const [mediaResult, countResult] = await Promise.all([
     c.get('db').prepare(
       `SELECT id, media_type, width, height, alt, title, description, duration,
-              poster_r2_key, blur_data_url, sort_order
+              poster_r2_key, blur_data_url, sort_order, metadata
        FROM media
        WHERE gallery_id = ? AND user_id = ? AND status = 'ready' AND deleted_at IS NULL
        ORDER BY sort_order ASC, created_at ASC

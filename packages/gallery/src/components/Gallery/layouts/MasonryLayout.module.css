@@ -1,21 +1,10 @@
 .masonry {
-  display: grid;
-  gap: var(--hexi-gap-md, 16px);
   width: 100%;
+  touch-action: manipulation;
 }
 
-.column {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Images in masonry should show natural aspect ratio */
-.column :global(.gallery-image) {
+.item :global(.gallery-image) {
   width: 100%;
-  height: auto;
-}
-
-/* Images without dimensions get a reasonable default */
-.column :global(.gallery-image:not([style*="aspect-ratio"])) {
-  aspect-ratio: 4 / 3;
+  height: 100%;
+  object-fit: cover;
 }

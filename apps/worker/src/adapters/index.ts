@@ -8,7 +8,7 @@ import { PassthroughTransformer } from './passthrough-transform';
 export type { StorageAdapter } from './storage';
 export type { StorageObject, StoragePutOptions } from './storage';
 export type { DatabaseAdapter, DatabaseStatement, DatabaseResult } from './database';
-export type { ImageTransformer, ImageTransformOptions } from './image-transform';
+export type { ImageTransformer, ImageTransformOptions, ImageAnalysis } from './image-transform';
 
 export interface Adapters {
   storage: StorageAdapter;

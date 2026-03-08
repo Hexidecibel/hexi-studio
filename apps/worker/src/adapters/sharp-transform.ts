@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import type { ImageTransformer, ImageTransformOptions } from './image-transform';
+import type { ImageTransformer, ImageTransformOptions, ImageAnalysis } from './image-transform';
 
 export class SharpTransformer implements ImageTransformer {
   async transform(
@@ -52,6 +52,40 @@ export class SharpTransformer implements ImageTransformer {
     });
 
     return { body: stream, contentType };
+  }
+
+  async analyze(input: ArrayBuffer): Promise<ImageAnalysis | null> {
+    try {
+      const buffer = Buffer.from(input);
+      const [stats, meta] = await Promise.all([
+        sharp(buffer).stats(),
+        sharp(buffer).metadata(),
+      ]);
+
+      // Entropy (60% weight): average Shannon entropy across RGB channels, normalize 4-7.5 to 0-1
+      const channelEntropies = stats.channels.slice(0, 3).map((ch) => ch.entropy);
+      const averageEntropy = channelEntropies.reduce((a, b) => a + b, 0) / channelEntropies.length;
+      const normalizedEntropy = Math.max(0, Math.min(1, (averageEntropy - 4) / (7.5 - 4)));
+
+      const width = meta.width || 0;
+      const height = meta.height || 0;
+      const pixels = width * height;
+
+      // Resolution (25% weight): log scale, cap at 12MP
+      const resolutionScore = Math.min(1, pixels > 0 ? Math.log(pixels) / Math.log(12_000_000) : 0);
+
+      // Aspect ratio (15% weight): prefer 1.0-2.0 range
+      const ratio = Math.min(width, height) > 0 ? Math.max(width, height) / Math.min(width, height) : 1;
+      const aspectScore = ratio <= 2 ? 1.0 : Math.max(0, 1 - (ratio - 2) / 3);
+
+      const qualityScore = Math.max(0, Math.min(1,
+        normalizedEntropy * 0.6 + resolutionScore * 0.25 + aspectScore * 0.15
+      ));
+
+      return { entropy: averageEntropy, resolution: pixels, qualityScore };
+    } catch {
+      return null;
+    }
   }
 }
 

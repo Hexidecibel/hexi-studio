@@ -104,10 +104,30 @@ library.put('/:mediaId/upload', async (c) => {
     httpMetadata: { contentType: record.content_type as string },
   });
 
+  // Analyze image quality (non-fatal)
+  let metadata = '{}';
+  const contentType = record.content_type as string;
+  if (contentType.startsWith('image/')) {
+    try {
+      const transformer = c.get('imageTransformer');
+      if (transformer.analyze) {
+        const analysis = await transformer.analyze(body);
+        if (analysis) {
+          metadata = JSON.stringify({
+            qualityScore: analysis.qualityScore,
+            entropy: analysis.entropy,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Image analysis failed:', err);
+    }
+  }
+
   // Update status and storage
   await c.get('db').prepare(
-    "UPDATE library_media SET status = 'ready', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?"
-  ).bind(mediaId, user.id).run();
+    "UPDATE library_media SET status = 'ready', metadata = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?"
+  ).bind(metadata, mediaId, user.id).run();
 
   await c.get('db').prepare(
     'UPDATE users SET storage_used_bytes = storage_used_bytes + ? WHERE id = ?'

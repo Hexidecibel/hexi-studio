@@ -133,6 +133,25 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
     httpMetadata: { contentType },
   });
 
+  // Analyze image quality (non-fatal)
+  let metadata = '{}';
+  if (contentType.startsWith('image/')) {
+    try {
+      const transformer = c.get('imageTransformer');
+      if (transformer.analyze) {
+        const analysis = await transformer.analyze(body);
+        if (analysis) {
+          metadata = JSON.stringify({
+            qualityScore: analysis.qualityScore,
+            entropy: analysis.entropy,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Image analysis failed:', err);
+    }
+  }
+
   // Get next sort order
   const maxOrder = await c.get('db').prepare(
     'SELECT MAX(sort_order) as max_order FROM media WHERE gallery_id = ? AND deleted_at IS NULL'
@@ -147,10 +166,10 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
   const mediaType = getMediaType(contentType);
 
   await c.get('db').prepare(
-    `INSERT INTO media (id, gallery_id, user_id, filename, content_type, file_size, r2_key, media_type, sort_order, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready')`
+    `INSERT INTO media (id, gallery_id, user_id, filename, content_type, file_size, r2_key, media_type, sort_order, status, metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?)`
   )
-    .bind(mediaId, galleryId, user.id, filename, contentType, fileSize, r2Key, mediaType, sortOrder)
+    .bind(mediaId, galleryId, user.id, filename, contentType, fileSize, r2Key, mediaType, sortOrder, metadata)
     .run();
 
   // Update user storage

@@ -14,6 +14,14 @@ export interface MasonryLayoutProps {
   onImageLoad?: () => void;
 }
 
+interface ItemPosition {
+  image: ImageItem;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function getMasonryColumnCount(containerWidth: number, explicitColumns: number | 'auto' | undefined): number {
   if (explicitColumns && explicitColumns !== 'auto') return explicitColumns;
   if (containerWidth < 400) return 1;
@@ -23,23 +31,88 @@ function getMasonryColumnCount(containerWidth: number, explicitColumns: number |
   return 5;
 }
 
-function distributeIntoColumns(
-  images: ImageItem[],
-  columnCount: number
-): ImageItem[][] {
-  const columns: ImageItem[][] = Array.from({ length: columnCount }, () => []);
-  const columnHeights: number[] = Array(columnCount).fill(0);
+function getSpanningItems(images: ImageItem[], columnCount: number): Set<string> {
+  if (columnCount < 2) return new Set();
 
-  images.forEach((image) => {
-    const shortestIndex = columnHeights.indexOf(Math.min(...columnHeights));
-    columns[shortestIndex].push(image);
+  const scored = images
+    .filter((img) => typeof img.metadata?.qualityScore === 'number')
+    .map((img) => ({ id: img.id, score: img.metadata!.qualityScore as number }));
+
+  if (scored.length === 0) return new Set();
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // Top 20% of scored images, but cap at 15% of total
+  const maxSpan = Math.max(1, Math.floor(images.length * 0.15));
+  const top20pct = Math.max(1, Math.floor(scored.length * 0.2));
+  const spanCount = Math.min(maxSpan, top20pct);
+
+  const spanning = new Set<string>();
+  for (let i = 0; i < spanCount; i++) {
+    if (scored[i].score >= 0.6) {
+      spanning.add(scored[i].id);
+    }
+  }
+
+  return spanning;
+}
+
+function computeMasonryPositions(
+  images: ImageItem[],
+  columnCount: number,
+  containerWidth: number,
+  gapPx: number,
+  spanningItems: Set<string>
+): { positions: ItemPosition[]; containerHeight: number } {
+  const colWidth = (containerWidth - gapPx * (columnCount - 1)) / columnCount;
+  const columnHeights: number[] = Array(columnCount).fill(0);
+  const positions: ItemPosition[] = [];
+
+  for (const image of images) {
+    const spans = spanningItems.has(image.id) && columnCount >= 2;
     const aspectRatio = image.width && image.height
       ? image.height / image.width
       : 0.75;
-    columnHeights[shortestIndex] += aspectRatio;
-  });
 
-  return columns;
+    if (spans) {
+      // Find best pair of adjacent columns (lowest max height between them)
+      let bestStart = 0;
+      let bestMaxHeight = Infinity;
+      for (let i = 0; i < columnCount - 1; i++) {
+        const maxH = Math.max(columnHeights[i], columnHeights[i + 1]);
+        if (maxH < bestMaxHeight) {
+          bestMaxHeight = maxH;
+          bestStart = i;
+        }
+      }
+
+      const itemWidth = colWidth * 2 + gapPx;
+      const itemHeight = itemWidth * aspectRatio;
+      const x = bestStart * (colWidth + gapPx);
+      const y = bestMaxHeight;
+
+      positions.push({ image, x, y, width: itemWidth, height: itemHeight });
+
+      const newHeight = y + itemHeight + gapPx;
+      columnHeights[bestStart] = newHeight;
+      columnHeights[bestStart + 1] = newHeight;
+    } else {
+      // Place in shortest column
+      const shortestIdx = columnHeights.indexOf(Math.min(...columnHeights));
+      const itemWidth = colWidth;
+      const itemHeight = itemWidth * aspectRatio;
+      const x = shortestIdx * (colWidth + gapPx);
+      const y = columnHeights[shortestIdx];
+
+      positions.push({ image, x, y, width: itemWidth, height: itemHeight });
+
+      columnHeights[shortestIdx] = y + itemHeight + gapPx;
+    }
+  }
+
+  // Remove trailing gap from container height
+  const containerHeight = Math.max(...columnHeights) - (positions.length > 0 ? gapPx : 0);
+  return { positions, containerHeight: Math.max(0, containerHeight) };
 }
 
 export function MasonryLayout({
@@ -50,7 +123,8 @@ export function MasonryLayout({
   virtualize,
   onImageLoad,
 }: MasonryLayoutProps) {
-  const gap = typeof layout.gap === 'number' ? `${layout.gap}px` : layout.gap || '16px';
+  const gapStr = typeof layout.gap === 'number' ? `${layout.gap}px` : layout.gap || '16px';
+  const gapPx = parseFloat(gapStr) || 16;
   const { ref: widthRef, width: containerWidth } = useContainerWidth();
   const columnCount = getMasonryColumnCount(containerWidth, layout.columns);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,68 +138,80 @@ export function MasonryLayout({
     return <div ref={setRefs} className={`${styles.masonry} gallery-masonry`} />;
   }
 
-  const columns = useMemo(
-    () => distributeIntoColumns(images, columnCount),
+  const spanningItems = useMemo(
+    () => getSpanningItems(images, columnCount),
     [images, columnCount]
   );
 
-  const getOriginalIndex = (image: ImageItem) =>
-    images.findIndex((img) => img.id === image.id);
+  const { positions, containerHeight } = useMemo(
+    () => computeMasonryPositions(images, columnCount, containerWidth, gapPx, spanningItems),
+    [images, columnCount, containerWidth, gapPx, spanningItems]
+  );
 
-  // Virtualize based on the longest column's item count
+  // Virtualization: estimate rows for scroll-based visibility
+  const estimatedRows = Math.ceil(images.length / columnCount);
   const enabled = virtualize === true || typeof virtualize === 'number';
-  const maxColumnLength = Math.max(...columns.map((c) => c.length), 0);
   const { virtualItems, isVirtualized } = useVirtualization({
-    totalCount: maxColumnLength,
+    totalCount: estimatedRows,
     estimatedItemHeight: 280,
     containerRef,
     enabled,
   });
 
-  const gridStyle: React.CSSProperties = {
-    gap,
-    gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
-  };
-
-  // When virtualized, only render items whose row index falls within the visible range
-  const visibleRowStart = isVirtualized && virtualItems.length > 0
-    ? virtualItems[0].index
+  // Compute visible Y range for virtualization
+  const visibleTop = isVirtualized && virtualItems.length > 0
+    ? virtualItems[0].index * 280
     : 0;
-  const visibleRowEnd = isVirtualized && virtualItems.length > 0
-    ? virtualItems[virtualItems.length - 1].index
-    : maxColumnLength - 1;
+  const visibleBottom = isVirtualized && virtualItems.length > 0
+    ? (virtualItems[virtualItems.length - 1].index + 1) * 280
+    : containerHeight;
 
   return (
-    <div ref={setRefs} className={`${styles.masonry} gallery-masonry`} style={gridStyle}>
-      {columns.map((column, colIndex) => (
-        <div key={colIndex} className={styles.column} style={{ gap }}>
-          {column.map((image, rowInCol) => {
-            if (isVirtualized && (rowInCol < visibleRowStart || rowInCol > visibleRowEnd)) {
-              // Render a spacer to preserve layout height
-              const aspectRatio = image.width && image.height
-                ? image.height / image.width
-                : 0.75;
-              return (
-                <div
-                  key={image.id}
-                  style={{ aspectRatio: `1 / ${aspectRatio}`, width: '100%' }}
-                  aria-hidden="true"
-                />
-              );
-            }
-            return (
-              <GalleryImage
-                key={image.id}
-                image={image}
-                index={getOriginalIndex(image)}
-                onClick={onImageClick}
-                loading={loading}
-                onImageLoad={onImageLoad}
-              />
-            );
-          })}
-        </div>
-      ))}
+    <div
+      ref={setRefs}
+      className={`${styles.masonry} gallery-masonry`}
+      style={{ position: 'relative', height: containerHeight }}
+    >
+      {positions.map((pos, index) => {
+        // Virtualization: skip items outside visible range
+        if (isVirtualized && (pos.y + pos.height < visibleTop || pos.y > visibleBottom)) {
+          return (
+            <div
+              key={pos.image.id}
+              style={{
+                position: 'absolute',
+                left: pos.x,
+                top: pos.y,
+                width: pos.width,
+                height: pos.height,
+              }}
+              aria-hidden="true"
+            />
+          );
+        }
+
+        return (
+          <div
+            key={pos.image.id}
+            className={styles.item}
+            style={{
+              position: 'absolute',
+              left: pos.x,
+              top: pos.y,
+              width: pos.width,
+              height: pos.height,
+            }}
+          >
+            <GalleryImage
+              image={pos.image}
+              index={index}
+              onClick={onImageClick}
+              loading={loading}
+              onImageLoad={onImageLoad}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

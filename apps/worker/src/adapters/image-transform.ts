@@ -1,3 +1,9 @@
+export interface ImageAnalysis {
+  entropy: number;
+  resolution: number;
+  qualityScore: number;
+}
+
 export interface ImageTransformOptions {
   width?: number;
   height?: number;
@@ -12,4 +18,6 @@ export interface ImageTransformer {
     options: ImageTransformOptions,
     acceptHeader?: string
   ): Promise<{ body: ReadableStream; contentType: string }>;
+
+  analyze?(input: ArrayBuffer): Promise<ImageAnalysis | null>;
 }

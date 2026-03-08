@@ -135,7 +135,7 @@ export function usePinchZoom({
     () => ({
       transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
       transformOrigin: 'center center',
-      touchAction: isZoomed ? 'none' : 'auto',
+      touchAction: isZoomed ? 'none' : 'manipulation',
     }),
     [scale, translateX, translateY, isZoomed],
   );

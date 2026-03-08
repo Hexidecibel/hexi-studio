@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+// Load env
+require('dotenv').config({ path: path.join(__dirname, '../apps/worker/.env.local') });
+
+const Database = require('better-sqlite3');
+
+const dbPath = process.env.DATABASE_PATH;
+const storagePath = process.env.STORAGE_PATH;
+
+if (!dbPath || !storagePath) {
+  console.error('DATABASE_PATH and STORAGE_PATH must be set in apps/worker/.env.local');
+  process.exit(1);
+}
+
+const db = new Database(dbPath);
+
+async function analyzeImage(filePath) {
+  const sharp = (await import('sharp')).default;
+  const buffer = fs.readFileSync(filePath);
+  const [stats, meta] = await Promise.all([
+    sharp(buffer).stats(),
+    sharp(buffer).metadata(),
+  ]);
+
+  const w = meta.width || 1;
+  const h = meta.height || 1;
+
+  // Entropy: average across channels, normalize 4-7.5 to 0-1
+  const avgEntropy = stats.channels.slice(0, 3).reduce((s, c) => s + c.entropy, 0) / Math.min(3, stats.channels.length);
+  const entropyNorm = Math.max(0, Math.min(1, (avgEntropy - 4) / 3.5));
+
+  // Resolution: log scale, capped at 12MP
+  const pixels = w * h;
+  const resolutionNorm = Math.min(1, Math.log(pixels) / Math.log(12_000_000));
+
+  // Aspect ratio: landscape/moderate best
+  const ratio = Math.max(w, h) / Math.min(w, h);
+  const aspectScore = ratio <= 2 ? 1.0 : Math.max(0, 1 - (ratio - 2) / 3);
+
+  // Weighted composite
+  const qualityScore = Math.max(0, Math.min(1,
+    entropyNorm * 0.6 + resolutionNorm * 0.25 + aspectScore * 0.15
+  ));
+
+  return { entropy: avgEntropy, resolution: pixels, qualityScore };
+}
+
+async function main() {
+  // Query both tables for images without quality scores
+  const mediaRows = db.prepare(
+    "SELECT id, user_id, r2_key, content_type, metadata FROM media WHERE content_type LIKE 'image/%' AND deleted_at IS NULL AND (metadata IS NULL OR metadata = '{}' OR metadata = '')"
+  ).all();
+
+  const libraryRows = db.prepare(
+    "SELECT id, user_id, r2_key, content_type, metadata FROM library_media WHERE content_type LIKE 'image/%' AND deleted_at IS NULL AND (metadata IS NULL OR metadata = '{}' OR metadata = '')"
+  ).all();
+
+  const allRows = [
+    ...mediaRows.map(r => ({ ...r, table: 'media' })),
+    ...libraryRows.map(r => ({ ...r, table: 'library_media' })),
+  ];
+
+  console.log(`Found ${allRows.length} images to analyze (${mediaRows.length} media, ${libraryRows.length} library)`);
+
+  if (allRows.length === 0) {
+    console.log('Nothing to do.');
+    return;
+  }
+
+  const updateMedia = db.prepare("UPDATE media SET metadata = ? WHERE id = ?");
+  const updateLibrary = db.prepare("UPDATE library_media SET metadata = ? WHERE id = ?");
+
+  let processed = 0;
+  let failed = 0;
+
+  for (const row of allRows) {
+    // Files are stored at {STORAGE_PATH}/{r2_key} (no subdirectory prefix)
+    const filePath = path.join(storagePath, row.r2_key);
+
+    if (!fs.existsSync(filePath)) {
+      console.warn(`  SKIP ${row.id} — file not found: ${filePath}`);
+      failed++;
+      continue;
+    }
+
+    try {
+      const analysis = await analyzeImage(filePath);
+      const metadata = JSON.stringify({
+        qualityScore: analysis.qualityScore,
+        entropy: analysis.entropy,
+      });
+
+      if (row.table === 'media') {
+        updateMedia.run(metadata, row.id);
+      } else {
+        updateLibrary.run(metadata, row.id);
+      }
+
+      processed++;
+      if (processed % 10 === 0 || processed === allRows.length) {
+        console.log(`  Progress: ${processed}/${allRows.length} (${failed} failed)`);
+      }
+    } catch (err) {
+      console.warn(`  FAIL ${row.id}: ${err.message}`);
+      failed++;
+    }
+  }
+
+  console.log(`\nDone! Processed: ${processed}, Failed: ${failed}, Total: ${allRows.length}`);
+  db.close();
+}
+
+main().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
