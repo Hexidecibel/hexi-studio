@@ -20,6 +20,8 @@ export interface LightboxProps {
   onPrev: () => void;
   renderLightboxFooter?: (image: ImageItem, index: number) => React.ReactNode;
   enableDownload?: boolean;
+  enableShare?: boolean;
+  onShare?: (image: ImageItem) => void;
   enableSlideshow?: boolean;
   isPlaying?: boolean;
   onToggleSlideshow?: () => void;
@@ -38,6 +40,8 @@ export function Lightbox({
   onPrev,
   renderLightboxFooter,
   enableDownload,
+  enableShare,
+  onShare,
   enableSlideshow,
   isPlaying,
   onToggleSlideshow,
@@ -66,6 +70,13 @@ export function Lightbox({
       onPauseSlideshow?.();
     }
   }, [isVideoPlaying, onPauseSlideshow]);
+
+  const handleShare = useCallback(() => {
+    const image = images[currentIndex];
+    if (onShare && image) {
+      onShare(image);
+    }
+  }, [onShare, images, currentIndex]);
 
   const handleBackdropClick = useCallback(() => {
     onClose();
@@ -101,6 +112,8 @@ export function Lightbox({
         onPrev={onPrev}
         renderLightboxFooter={renderLightboxFooter}
         enableDownload={enableDownload}
+        enableShare={enableShare}
+        onShare={handleShare}
         enableSlideshow={enableSlideshow}
         isPlaying={isPlaying}
         onToggleSlideshow={onToggleSlideshow}

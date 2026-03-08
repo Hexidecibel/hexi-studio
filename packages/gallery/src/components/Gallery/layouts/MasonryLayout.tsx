@@ -12,6 +12,10 @@ export interface MasonryLayoutProps {
   loading?: 'lazy' | 'eager';
   virtualize?: boolean | number;
   onImageLoad?: () => void;
+  isSelecting?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (image: ImageItem) => void;
+  onLongPress?: (image: ImageItem) => void;
 }
 
 interface ItemPosition {
@@ -122,6 +126,10 @@ export function MasonryLayout({
   loading,
   virtualize,
   onImageLoad,
+  isSelecting,
+  selected,
+  onToggleSelect,
+  onLongPress,
 }: MasonryLayoutProps) {
   const gapStr = typeof layout.gap === 'number' ? `${layout.gap}px` : layout.gap || '16px';
   const gapPx = parseFloat(gapStr) || 16;
@@ -208,6 +216,10 @@ export function MasonryLayout({
               onClick={onImageClick}
               loading={loading}
               onImageLoad={onImageLoad}
+              isSelecting={isSelecting}
+              isSelected={selected?.has(pos.image.id)}
+              onToggleSelect={onToggleSelect}
+              onLongPress={onLongPress}
             />
           </div>
         );

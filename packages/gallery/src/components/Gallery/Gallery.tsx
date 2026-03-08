@@ -1,12 +1,14 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import type { GalleryProps, ImageItem } from '../../types';
 import { DEFAULT_LAYOUT } from '../../types';
 import { useLightbox } from '../../hooks/useLightbox';
+import { useSelection } from '../../hooks/useSelection';
 import { GridLayout } from './layouts/GridLayout';
 import { MasonryLayout } from './layouts/MasonryLayout';
 import { JustifiedLayout } from './layouts/JustifiedLayout';
 import { ShowcaseLayout } from './layouts/ShowcaseLayout';
 import { Lightbox } from './Lightbox';
+import { SelectionBar } from './SelectionBar';
 import styles from './Gallery.module.css';
 
 export function Gallery({
@@ -24,6 +26,10 @@ export function Gallery({
   enableSlideshow,
   slideshowInterval,
   shuffle,
+  enableSelection,
+  enableShare,
+  onShare,
+  renderSelectionBar,
 }: GalleryProps) {
   const resolvedLayout = { ...DEFAULT_LAYOUT, ...layout };
 
@@ -39,14 +45,59 @@ export function Gallery({
 
   const lightbox = useLightbox({ images: displayImages, slideshowInterval });
 
+  const selection = useSelection();
+
+  // Exit selection mode on Escape
+  useEffect(() => {
+    if (!selection.isSelecting) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        selection.exitSelectionMode();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selection.isSelecting, selection.exitSelectionMode]);
+
   const handleImageClick = useCallback(
     (image: ImageItem, index: number) => {
+      if (selection.isSelecting) return; // selection toggle handled by GalleryImage
       onImageClick?.(image, index);
       if (enableLightbox) {
         lightbox.open(index);
       }
     },
-    [onImageClick, enableLightbox, lightbox],
+    [onImageClick, enableLightbox, lightbox, selection.isSelecting],
+  );
+
+  const handleLongPress = useCallback(
+    (image: ImageItem) => {
+      if (enableSelection) {
+        selection.enterSelectionMode(image.id);
+      }
+    },
+    [enableSelection, selection.enterSelectionMode],
+  );
+
+  const handleToggleSelect = useCallback(
+    (image: ImageItem) => {
+      selection.toggle(image.id);
+    },
+    [selection.toggle],
+  );
+
+  const handleShareFromLightbox = useCallback(
+    (image: ImageItem) => {
+      onShare?.([image]);
+    },
+    [onShare],
+  );
+
+  const handleShareSelected = useCallback(
+    (selectedImages: ImageItem[]) => {
+      onShare?.(selectedImages);
+    },
+    [onShare],
   );
 
   const containerClassName = [styles.gallery, className].filter(Boolean).join(' ');
@@ -66,7 +117,18 @@ export function Gallery({
     loading,
     virtualize,
     onImageLoad,
+    ...(enableSelection && {
+      isSelecting: selection.isSelecting,
+      selected: selection.selected,
+      onToggleSelect: handleToggleSelect,
+      onLongPress: handleLongPress,
+    }),
   };
+
+  const selectedImages = useMemo(
+    () => displayImages.filter((img) => selection.selected.has(img.id)),
+    [displayImages, selection.selected],
+  );
 
   return (
     <div className={containerClassName}>
@@ -97,7 +159,23 @@ export function Gallery({
           isPlaying={lightbox.isPlaying}
           onToggleSlideshow={lightbox.toggleSlideshow}
           onPauseSlideshow={lightbox.pauseSlideshow}
+          enableShare={enableShare}
+          onShare={handleShareFromLightbox}
         />
+      )}
+
+      {enableSelection && selection.isSelecting && (
+        renderSelectionBar ? (
+          renderSelectionBar(selectedImages, selection.exitSelectionMode)
+        ) : (
+          <SelectionBar
+            count={selection.count}
+            selectedImages={selectedImages}
+            onShare={onShare ? handleShareSelected : undefined}
+            onDeselectAll={selection.deselectAll}
+            onExit={selection.exitSelectionMode}
+          />
+        )
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import type { ImageItem } from '../../types';
 import { isVideoItem } from '../../types';
 import { useIntersectionObserver } from '../../hooks/useIntersectionObserver';
+import { useLongPress } from '../../hooks/useLongPress';
 import styles from './GalleryImage.module.css';
 
 function formatDuration(seconds: number): string {
@@ -17,6 +18,10 @@ export interface GalleryImageProps {
   loading?: 'lazy' | 'eager';
   className?: string;
   onImageLoad?: () => void;
+  isSelecting?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (image: ImageItem) => void;
+  onLongPress?: (image: ImageItem) => void;
 }
 
 export function GalleryImage({
@@ -26,10 +31,19 @@ export function GalleryImage({
   loading = 'lazy',
   className,
   onImageLoad,
+  isSelecting,
+  isSelected,
+  onToggleSelect,
+  onLongPress,
 }: GalleryImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const { ref, isIntersecting } = useIntersectionObserver({ rootMargin: '200px' });
+
+  const longPressHandlers = useLongPress({
+    onLongPress: () => onLongPress?.(image),
+    delay: 500,
+  });
 
   const handleLoad = useCallback(() => {
     setIsLoaded(true);
@@ -41,8 +55,12 @@ export function GalleryImage({
   }, []);
 
   const handleClick = useCallback(() => {
-    onClick?.(image, index);
-  }, [onClick, image, index]);
+    if (isSelecting && onToggleSelect) {
+      onToggleSelect(image);
+    } else {
+      onClick?.(image, index);
+    }
+  }, [onClick, image, index, isSelecting, onToggleSelect]);
 
   const shouldRenderImg = isIntersecting || loading === 'eager';
   const isVideo = isVideoItem(image);
@@ -103,16 +121,32 @@ export function GalleryImage({
           )}
         </>
       )}
+      {isSelecting && (
+        <div className={`${styles.selectionOverlay} ${isSelected ? styles.selected : ''}`} aria-hidden="true">
+          <svg viewBox="0 0 24 24" className={styles.checkIcon}>
+            {isSelected ? (
+              <>
+                <circle cx="12" cy="12" r="11" fill="var(--hexi-selection-color, #4dabf7)" stroke="white" strokeWidth="2" />
+                <polyline points="7 12 10 15 17 9" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </>
+            ) : (
+              <circle cx="12" cy="12" r="11" fill="rgba(0,0,0,0.3)" stroke="white" strokeWidth="2" />
+            )}
+          </svg>
+        </div>
+      )}
     </>
   );
 
   const wrapperClassName = [
     styles.wrapper,
     'gallery-image',
+    isSelecting && styles.selecting,
+    isSelected && styles.selectedWrapper,
     className,
   ].filter(Boolean).join(' ');
 
-  if (onClick) {
+  if (onClick || (isSelecting && onToggleSelect)) {
     return (
       <button
         ref={ref as unknown as React.RefObject<HTMLButtonElement>}
@@ -121,6 +155,7 @@ export function GalleryImage({
         style={wrapperStyle}
         onClick={handleClick}
         aria-label={image.title || image.alt}
+        {...(onLongPress ? longPressHandlers : {})}
       >
         {fullContent}
       </button>

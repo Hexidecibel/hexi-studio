@@ -28,6 +28,8 @@ export { Gallery } from './components/Gallery';
 export { GalleryImage } from './components/Gallery';
 export { Lightbox } from './components/Gallery';
 export type { LightboxProps } from './components/Gallery';
+export { SelectionBar } from './components/Gallery/SelectionBar';
+export type { SelectionBarProps } from './components/Gallery/SelectionBar';
 
 // Hooks
 export { useLightbox } from './hooks/useLightbox';
@@ -38,6 +40,10 @@ export { useSourceAdapter } from './hooks/useSourceAdapter';
 export { useAsyncAdapter } from './hooks/useAsyncAdapter';
 export { useHexiCloud } from './hooks/useHexiCloud';
 export type { HexiCloudOptions, HexiCloudResult } from './hooks/useHexiCloud';
+export { useSelection } from './hooks/useSelection';
+export type { UseSelectionReturn } from './hooks/useSelection';
+export { useLongPress } from './hooks/useLongPress';
+export type { UseLongPressOptions, UseLongPressHandlers } from './hooks/useLongPress';
 
 // Adapters
 export { urlAdapter, s3Adapter, asyncAdapter, hexiCloudAdapter } from './adapters';

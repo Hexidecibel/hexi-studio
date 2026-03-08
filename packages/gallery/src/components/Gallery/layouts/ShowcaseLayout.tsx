@@ -11,6 +11,10 @@ export interface ShowcaseLayoutProps {
   loading?: 'lazy' | 'eager';
   virtualize?: boolean | number;
   onImageLoad?: () => void;
+  isSelecting?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (image: ImageItem) => void;
+  onLongPress?: (image: ImageItem) => void;
 }
 
 export function ShowcaseLayout({
@@ -19,6 +23,10 @@ export function ShowcaseLayout({
   onImageClick,
   loading,
   onImageLoad,
+  isSelecting,
+  selected,
+  onToggleSelect,
+  onLongPress,
 }: ShowcaseLayoutProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const { ref: widthRef, width: containerWidth } = useContainerWidth();
@@ -90,6 +98,10 @@ export function ShowcaseLayout({
           loading={loading}
           onImageLoad={onImageLoad}
           className={styles.featuredImage}
+          isSelecting={isSelecting}
+          isSelected={selected?.has(activeImage.id)}
+          onToggleSelect={onToggleSelect}
+          onLongPress={onLongPress}
         />
       </div>
 

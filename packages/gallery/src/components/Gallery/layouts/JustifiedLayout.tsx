@@ -12,6 +12,10 @@ export interface JustifiedLayoutProps {
   /** Not supported for justified layout (row composition depends on full image list) */
   virtualize?: boolean | number;
   onImageLoad?: () => void;
+  isSelecting?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (image: ImageItem) => void;
+  onLongPress?: (image: ImageItem) => void;
 }
 
 interface Row {
@@ -63,6 +67,10 @@ export function JustifiedLayout({
   loading,
   virtualize: _virtualize,
   onImageLoad,
+  isSelecting,
+  selected,
+  onToggleSelect,
+  onLongPress,
 }: JustifiedLayoutProps) {
   const { ref, width: containerWidth } = useContainerWidth();
   const gap = typeof layout.gap === 'number' ? layout.gap : 16;
@@ -105,6 +113,10 @@ export function JustifiedLayout({
                   loading={loading}
                   onImageLoad={onImageLoad}
                   className={styles.image}
+                  isSelecting={isSelecting}
+                  isSelected={selected?.has(image.id)}
+                  onToggleSelect={onToggleSelect}
+                  onLongPress={onLongPress}
                 />
               );
             })}

@@ -12,6 +12,10 @@ export interface GridLayoutProps {
   loading?: 'lazy' | 'eager';
   virtualize?: boolean | number;
   onImageLoad?: () => void;
+  isSelecting?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (image: ImageItem) => void;
+  onLongPress?: (image: ImageItem) => void;
 }
 
 function getColumnCount(containerWidth: number, explicitColumns: number | 'auto' | undefined): number {
@@ -30,6 +34,10 @@ export function GridLayout({
   loading,
   virtualize,
   onImageLoad,
+  isSelecting,
+  selected,
+  onToggleSelect,
+  onLongPress,
 }: GridLayoutProps) {
   const gapNum = typeof layout.gap === 'number' ? layout.gap : 16;
   const gapStr = typeof layout.gap === 'string' ? layout.gap : `${gapNum}px`;
@@ -92,6 +100,10 @@ export function GridLayout({
                   onClick={onImageClick}
                   loading={loading}
                   onImageLoad={onImageLoad}
+                  isSelecting={isSelecting}
+                  isSelected={selected?.has(image.id)}
+                  onToggleSelect={onToggleSelect}
+                  onLongPress={onLongPress}
                 />
               ))}
             </div>
@@ -111,6 +123,10 @@ export function GridLayout({
           onClick={onImageClick}
           loading={loading}
           onImageLoad={onImageLoad}
+          isSelecting={isSelecting}
+          isSelected={selected?.has(image.id)}
+          onToggleSelect={onToggleSelect}
+          onLongPress={onLongPress}
         />
       ))}
     </div>

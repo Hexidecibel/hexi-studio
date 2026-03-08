@@ -115,6 +115,14 @@ export interface GalleryProps {
   slideshowInterval?: number;
   /** Randomize image order on each load */
   shuffle?: boolean;
+  /** Enable long-press multi-select mode */
+  enableSelection?: boolean;
+  /** Show share button in lightbox */
+  enableShare?: boolean;
+  /** Called when user shares photos (from lightbox or selection bar) */
+  onShare?: (images: MediaItem[]) => void;
+  /** Custom render for selection action bar (overrides built-in SelectionBar) */
+  renderSelectionBar?: (selected: MediaItem[], exit: () => void) => React.ReactNode;
 }
 
 /**
