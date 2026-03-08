@@ -3,12 +3,16 @@ import { useRef, useCallback } from 'react';
 export interface UseSwipeOptions {
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
+  onSwipeDown?: () => void;
+  onSwipeUp?: () => void;
   threshold?: number;
 }
 
 export function useSwipe({
   onSwipeLeft,
   onSwipeRight,
+  onSwipeDown,
+  onSwipeUp,
   threshold = 50,
 }: UseSwipeOptions) {
   const startX = useRef(0);
@@ -30,16 +34,23 @@ export function useSwipe({
       const diffX = endX - startX.current;
       const diffY = endY - startY.current;
 
-      // Only count as horizontal swipe if horizontal distance > vertical distance
       if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) >= threshold) {
+        // Horizontal swipe
         if (diffX < 0) {
           onSwipeLeft?.();
         } else {
           onSwipeRight?.();
         }
+      } else if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) >= threshold) {
+        // Vertical swipe
+        if (diffY > 0) {
+          onSwipeDown?.();
+        } else {
+          onSwipeUp?.();
+        }
       }
     },
-    [onSwipeLeft, onSwipeRight, threshold],
+    [onSwipeLeft, onSwipeRight, onSwipeDown, onSwipeUp, threshold],
   );
 
   return { onTouchStart, onTouchMove, onTouchEnd };

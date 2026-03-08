@@ -59,6 +59,7 @@ export function Lightbox({
   const swipeHandlers = useSwipe({
     onSwipeLeft: isZoomed ? undefined : onNext,
     onSwipeRight: isZoomed ? undefined : onPrev,
+    onSwipeDown: isZoomed ? undefined : onClose,
   });
 
   useEffect(() => {
