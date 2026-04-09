@@ -45,9 +45,24 @@ app.use('/api/v1/*', async (c, next) => {
   const configuredOrigin = c.env.CORS_ORIGIN || '*';
   // When origin is '*', reflect the requesting origin back so credentials work.
   // Browsers reject wildcard Access-Control-Allow-Origin with credentials: true.
-  const origin = configuredOrigin === '*'
-    ? (requestOrigin: string) => requestOrigin || '*'
-    : configuredOrigin;
+  let origin: string | string[] | ((requestOrigin: string) => string | undefined | null);
+  if (configuredOrigin === '*') {
+    origin = (requestOrigin: string) => requestOrigin || '*';
+  } else if (configuredOrigin.includes(',')) {
+    // Support comma-separated origins, including wildcard patterns like *.example.com
+    const origins = configuredOrigin.split(',').map((o: string) => o.trim());
+    const exactOrigins = origins.filter((o: string) => !o.includes('*'));
+    const wildcardPatterns = origins
+      .filter((o: string) => o.includes('*'))
+      .map((o: string) => new RegExp('^' + o.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$'));
+    origin = (requestOrigin: string) => {
+      if (exactOrigins.includes(requestOrigin)) return requestOrigin;
+      if (wildcardPatterns.some((re: RegExp) => re.test(requestOrigin))) return requestOrigin;
+      return null as unknown as string;
+    };
+  } else {
+    origin = configuredOrigin;
+  }
   const corsMiddleware = cors({
     origin,
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
