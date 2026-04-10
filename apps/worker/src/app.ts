@@ -10,7 +10,9 @@ import { libraryRoutes } from './routes/library';
 import { publicRoutes } from './routes/public';
 import { cdnRoutes } from './routes/cdn';
 import { adminRoutes } from './routes/admin';
+import { googlePhotosRoutes } from './routes/google-photos';
 import { apiKeyRoutes } from './routes/api-keys';
+import { publicGalleryRoutes } from './routes/publicGallery';
 import oauth from './routes/oauth';
 import foursure from './routes/foursure';
 
@@ -39,7 +41,7 @@ app.use('*', logger());
 app.use('/api/v1/*', async (c, next) => {
   // Public and CDN routes have their own permissive CORS — skip global CORS for them
   const path = c.req.path;
-  if (path.startsWith('/api/v1/public/') || path.startsWith('/api/v1/cdn/')) {
+  if (path.startsWith('/api/v1/public/') || path.startsWith('/api/v1/cdn/') || path.startsWith('/api/v1/og/')) {
     return next();
   }
   const configuredOrigin = c.env.CORS_ORIGIN || '*';
@@ -76,17 +78,20 @@ app.use('/api/v1/*', async (c, next) => {
 // Public CORS (any origin)
 app.use('/api/v1/public/*', cors({ origin: '*', allowHeaders: ['Content-Type', 'X-API-Key'] }));
 app.use('/api/v1/cdn/*', cors({ origin: '*' }));
+app.use('/api/v1/og/*', cors({ origin: '*' }));
 
 // Mount routes
 app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/auth/oauth', oauth);
 app.route('/api/v1/auth/4sure', foursure);
 app.route('/api/v1/admin', adminRoutes);
+app.route('/api/v1/google-photos', googlePhotosRoutes);
 app.route('/api/v1/api-keys', apiKeyRoutes);
 app.route('/api/v1/galleries', galleryRoutes);
 app.route('/api/v1/library', libraryRoutes);
 app.route('/api/v1/cdn', cdnRoutes);
 app.route('/api/v1/public', publicRoutes);
+app.route('/api/v1/og', publicGalleryRoutes);
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));

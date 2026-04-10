@@ -47,7 +47,7 @@ galleryRoutes.post('/', async (c) => {
     .run();
 
   const gallery = await c.get('db').prepare(
-    `SELECT id, name, slug, config, published, created_at, updated_at FROM galleries WHERE id = ?`
+    `SELECT id, name, slug, config, published, visibility, created_at, updated_at FROM galleries WHERE id = ?`
   )
     .bind(id)
     .first();
@@ -64,7 +64,7 @@ galleryRoutes.get('/', async (c) => {
 
   const [galleries, countResult] = await Promise.all([
     c.get('db').prepare(
-      `SELECT g.id, g.name, g.slug, g.config, g.published, g.created_at, g.updated_at,
+      `SELECT g.id, g.name, g.slug, g.config, g.published, g.visibility, g.created_at, g.updated_at,
               (SELECT COUNT(*) FROM media m WHERE m.gallery_id = g.id AND m.deleted_at IS NULL) as media_count
        FROM galleries g
        WHERE g.user_id = ? AND g.deleted_at IS NULL
@@ -103,7 +103,7 @@ galleryRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
 
   const gallery = await c.get('db').prepare(
-    `SELECT g.id, g.name, g.slug, g.config, g.published, g.created_at, g.updated_at,
+    `SELECT g.id, g.name, g.slug, g.config, g.published, g.visibility, g.created_at, g.updated_at,
             (SELECT COUNT(*) FROM media m WHERE m.gallery_id = g.id AND m.deleted_at IS NULL) as media_count
      FROM galleries g
      WHERE g.id = ? AND g.user_id = ? AND g.deleted_at IS NULL`
@@ -127,7 +127,8 @@ galleryRoutes.patch('/:id', async (c) => {
     slug?: string;
     config?: Record<string, unknown>;
     published?: boolean;
-  }>().catch(() => ({} as { name?: string; slug?: string; config?: Record<string, unknown>; published?: boolean }));
+    visibility?: 'private' | 'public';
+  }>().catch(() => ({} as { name?: string; slug?: string; config?: Record<string, unknown>; published?: boolean; visibility?: 'private' | 'public' }));
 
   // Verify gallery exists and belongs to user
   const existing = await c.get('db').prepare(
@@ -181,6 +182,29 @@ galleryRoutes.patch('/:id', async (c) => {
     values.push(body.published ? 1 : 0);
   }
 
+  if (body.visibility !== undefined) {
+    if (body.visibility !== 'private' && body.visibility !== 'public') {
+      return c.json({ error: 'Visibility must be "private" or "public"' }, 400);
+    }
+    if (body.visibility === 'public') {
+      // Check global slug uniqueness for public galleries
+      const currentSlug = body.slug?.trim() || (await c.get('db').prepare(
+        'SELECT slug FROM galleries WHERE id = ? AND deleted_at IS NULL'
+      ).bind(id).first<{ slug: string }>())?.slug;
+
+      if (currentSlug) {
+        const slugConflict = await c.get('db').prepare(
+          `SELECT id FROM galleries WHERE slug = ? AND visibility = 'public' AND id != ? AND deleted_at IS NULL`
+        ).bind(currentSlug, id).first();
+        if (slugConflict) {
+          return c.json({ error: 'This slug is already taken by another public gallery. Choose a different slug.' }, 409);
+        }
+      }
+    }
+    updates.push('visibility = ?');
+    values.push(body.visibility);
+  }
+
   if (updates.length === 0) {
     return c.json({ error: 'No fields to update' }, 400);
   }
@@ -196,7 +220,7 @@ galleryRoutes.patch('/:id', async (c) => {
 
   // Fetch and return updated gallery
   const gallery = await c.get('db').prepare(
-    `SELECT g.id, g.name, g.slug, g.config, g.published, g.created_at, g.updated_at,
+    `SELECT g.id, g.name, g.slug, g.config, g.published, g.visibility, g.created_at, g.updated_at,
             (SELECT COUNT(*) FROM media m WHERE m.gallery_id = g.id AND m.deleted_at IS NULL) as media_count
      FROM galleries g
      WHERE g.id = ? AND g.user_id = ?`

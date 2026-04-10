@@ -82,7 +82,20 @@ export class SharpTransformer implements ImageTransformer {
         normalizedEntropy * 0.6 + resolutionScore * 0.25 + aspectScore * 0.15
       ));
 
-      return { entropy: averageEntropy, resolution: pixels, qualityScore };
+      // Generate LQIP blur placeholder
+      let blurDataUrl: string | undefined;
+      try {
+        const blurBuffer = await sharp(buffer)
+          .resize(20, 20, { fit: 'inside' })
+          .blur()
+          .toFormat('webp', { quality: 20 })
+          .toBuffer();
+        blurDataUrl = `data:image/webp;base64,${blurBuffer.toString('base64')}`;
+      } catch {
+        // Non-fatal — skip blur generation
+      }
+
+      return { entropy: averageEntropy, resolution: pixels, qualityScore, width, height, blurDataUrl };
     } catch {
       return null;
     }

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api, type Gallery, type MediaItem } from '../lib/api';
 import { MediaGrid } from '../components/MediaGrid';
+import { GooglePhotosImport } from '../components/GooglePhotosImport';
 
 export function GalleryEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -104,6 +105,11 @@ export function GalleryEditorPage() {
 
         <section className="editor-section">
           <h2>Media ({media.length} items)</h2>
+          <GooglePhotosImport
+            galleryId={gallery.id}
+            targetType="gallery"
+            onImportComplete={loadMedia}
+          />
           <MediaGrid
             galleryId={gallery.id}
             userId={user.id}

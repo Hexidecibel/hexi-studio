@@ -84,6 +84,47 @@ adminRoutes.delete('/users/:userId', async (c) => {
   return c.json({ message: 'User deleted' });
 });
 
+// PATCH /admin/users/:userId — Update user details
+adminRoutes.patch('/users/:userId', async (c) => {
+  const userId = c.req.param('userId');
+  const body = await c.req.json<{ name?: string; plan?: string; storage_limit_bytes?: number }>().catch(() => ({} as Record<string, unknown>));
+
+  const updates: string[] = [];
+  const values: unknown[] = [];
+
+  if (body.name !== undefined) {
+    updates.push('name = ?');
+    values.push(body.name);
+  }
+  if (body.plan !== undefined) {
+    updates.push('plan = ?');
+    values.push(body.plan);
+  }
+  if (body.storage_limit_bytes !== undefined) {
+    updates.push('storage_limit_bytes = ?');
+    values.push(body.storage_limit_bytes);
+  }
+
+  if (updates.length === 0) {
+    return c.json({ error: 'No valid fields to update' }, 400);
+  }
+
+  values.push(userId);
+  const result = await c.get('db').prepare(
+    `UPDATE users SET ${updates.join(', ')} WHERE id = ? AND deleted_at IS NULL`
+  ).bind(...values).run();
+
+  if (result.meta.changes === 0) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  const user = await c.get('db').prepare(
+    'SELECT id, email, name, plan, storage_used_bytes, storage_limit_bytes, created_at FROM users WHERE id = ?'
+  ).bind(userId).first();
+
+  return c.json({ data: user });
+});
+
 // POST /admin/users/:userId/tokens — Generate auto-login token for a user
 adminRoutes.post('/users/:userId/tokens', async (c) => {
   const userId = c.req.param('userId');
@@ -183,4 +224,42 @@ adminRoutes.post('/users/:userId/assume', async (c) => {
     expiresAt: session.expiresAt,
     assumedUser: { id: targetUser.id, email: targetUser.email },
   });
+});
+
+// GET /admin/settings — List all app settings
+adminRoutes.get('/settings', async (c) => {
+  const result = await c.get('db').prepare(
+    'SELECT key, value FROM app_settings'
+  ).all<{ key: string; value: string }>();
+
+  const settings: Record<string, string> = {};
+  for (const row of result.results) {
+    settings[row.key] = row.value;
+  }
+
+  return c.json({ data: settings });
+});
+
+// PUT /admin/settings — Bulk upsert settings
+adminRoutes.put('/settings', async (c) => {
+  const body = await c.req.json<{ settings: Record<string, string> }>().catch(() => ({ settings: {} }));
+
+  if (!body.settings || typeof body.settings !== 'object') {
+    return c.json({ error: 'settings object is required' }, 400);
+  }
+
+  const entries = Object.entries(body.settings);
+  if (entries.length === 0) {
+    return c.json({ error: 'No settings provided' }, 400);
+  }
+
+  const statements = entries.map(([key, value]) =>
+    c.get('db').prepare(
+      'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    ).bind(key, value)
+  );
+
+  await c.get('db').batch(statements);
+
+  return c.json({ message: 'Settings updated', count: entries.length });
 });

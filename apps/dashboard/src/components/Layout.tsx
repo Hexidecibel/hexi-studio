@@ -30,9 +30,14 @@ export function Layout() {
             Account
           </Link>
           {isAdmin && (
-            <Link to="/admin/tenants" className={location.pathname === '/admin/tenants' ? 'active' : ''}>
-              Tenants
-            </Link>
+            <>
+              <Link to="/admin/tenants" className={location.pathname === '/admin/tenants' ? 'active' : ''}>
+                Tenants
+              </Link>
+              <Link to="/admin/settings" className={location.pathname === '/admin/settings' ? 'active' : ''}>
+                Settings
+              </Link>
+            </>
           )}
         </nav>
         <div className="header-right">

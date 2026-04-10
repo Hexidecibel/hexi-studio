@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type DragEvent, type ChangeEv
 import { useAuth } from '../contexts/AuthContext';
 import { api, type LibraryItem } from '../lib/api';
 import { useUploadQueue } from '../hooks/useUploadQueue';
+import { GooglePhotosImport } from '../components/GooglePhotosImport';
 
 export function LibraryPage() {
   const { user } = useAuth();
@@ -274,6 +275,11 @@ export function LibraryPage() {
               ))}
             </div>
           )}
+
+          <GooglePhotosImport
+            targetType="library"
+            onImportComplete={loadItems}
+          />
         </section>
 
         {/* Tag filter */}

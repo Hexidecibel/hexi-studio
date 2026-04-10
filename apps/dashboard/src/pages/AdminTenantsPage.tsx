@@ -45,6 +45,13 @@ export function AdminTenantsPage() {
   const [generatedTokens, setGeneratedTokens] = useState<Record<string, string>>({});
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
 
+  // Edit state
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPlan, setEditPlan] = useState('');
+  const [editStorageLimit, setEditStorageLimit] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
   const loadUsers = useCallback(async () => {
     try {
       const result = await api.admin.listUsers();
@@ -142,6 +149,35 @@ export function AdminTenantsPage() {
     } catch (err) {
       console.error('Failed to revoke token:', err);
     }
+  };
+
+  const startEditing = (tenant: TenantUser) => {
+    setEditingUserId(tenant.id);
+    setEditName(tenant.name || '');
+    setEditPlan(tenant.plan);
+    setEditStorageLimit(String(Math.round(tenant.storage_limit_bytes / (1024 * 1024 * 1024))));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUserId) return;
+    setEditSaving(true);
+    try {
+      await api.admin.updateUser(editingUserId, {
+        name: editName || undefined,
+        plan: editPlan,
+        storage_limit_bytes: Math.round(parseFloat(editStorageLimit) * 1024 * 1024 * 1024),
+      });
+      setEditingUserId(null);
+      await loadUsers();
+    } catch (err) {
+      console.error('Failed to update user:', err);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingUserId(null);
   };
 
   const copyToClipboard = async (text: string, id?: string) => {
@@ -258,16 +294,77 @@ export function AdminTenantsPage() {
                   >
                     <div>
                       <strong>{tenant.email}</strong>
-                      {tenant.name && <span className="text-muted" style={{ marginLeft: '8px' }}>{tenant.name}</span>}
-                      <div className="text-muted" style={{ fontSize: '13px', marginTop: '4px' }}>
-                        <span style={{ textTransform: 'capitalize' }}>{tenant.plan}</span>
-                        {' · '}
-                        {formatBytes(tenant.storage_used_bytes)} / {formatBytes(tenant.storage_limit_bytes)}
-                        {' · '}
-                        Created {formatDate(tenant.created_at)}
-                      </div>
+                      {editingUserId === tenant.id ? (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Name"
+                            className="input"
+                            style={{ width: '150px', padding: '4px 8px', fontSize: '13px' }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <select
+                            value={editPlan}
+                            onChange={(e) => setEditPlan(e.target.value)}
+                            className="input"
+                            style={{ width: '120px', padding: '4px 8px', fontSize: '13px' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="free">Free</option>
+                            <option value="pro">Pro</option>
+                            <option value="enterprise">Enterprise</option>
+                          </select>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              value={editStorageLimit}
+                              onChange={(e) => setEditStorageLimit(e.target.value)}
+                              className="input"
+                              style={{ width: '80px', padding: '4px 8px', fontSize: '13px' }}
+                              min="0"
+                              step="0.1"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span style={{ fontSize: '13px' }}>GB</span>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }}
+                            disabled={editSaving}
+                            className="btn-primary btn-sm"
+                          >
+                            {editSaving ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); cancelEditing(); }}
+                            className="btn-secondary btn-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {tenant.name && <span className="text-muted" style={{ marginLeft: '8px' }}>{tenant.name}</span>}
+                          <div className="text-muted" style={{ fontSize: '13px', marginTop: '4px' }}>
+                            <span style={{ textTransform: 'capitalize' }}>{tenant.plan}</span>
+                            {' · '}
+                            {formatBytes(tenant.storage_used_bytes)} / {formatBytes(tenant.storage_limit_bytes)}
+                            {' · '}
+                            Created {formatDate(tenant.created_at)}
+                          </div>
+                        </>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {editingUserId !== tenant.id && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); startEditing(tenant); }}
+                          className="btn-secondary btn-sm"
+                        >
+                          Edit
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

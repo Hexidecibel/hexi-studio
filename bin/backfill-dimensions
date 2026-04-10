@@ -1,0 +1,95 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+// Load env
+require('dotenv').config({ path: path.join(__dirname, '../apps/worker/.env.local') });
+
+const Database = require('better-sqlite3');
+
+const dbPath = process.env.DATABASE_PATH;
+const storagePath = process.env.STORAGE_PATH;
+
+if (!dbPath || !storagePath) {
+  console.error('DATABASE_PATH and STORAGE_PATH must be set in apps/worker/.env.local');
+  process.exit(1);
+}
+
+const db = new Database(dbPath);
+
+async function getDimensions(filePath) {
+  const sharp = (await import('sharp')).default;
+  const buffer = fs.readFileSync(filePath);
+  const meta = await sharp(buffer).metadata();
+  return { width: meta.width, height: meta.height };
+}
+
+async function main() {
+  // Query both tables for images with missing dimensions
+  const mediaRows = db.prepare(
+    "SELECT id, user_id, r2_key, content_type FROM media WHERE content_type LIKE 'image/%' AND status = 'ready' AND deleted_at IS NULL AND (width IS NULL OR width = 0 OR height IS NULL OR height = 0)"
+  ).all();
+
+  const libraryRows = db.prepare(
+    "SELECT id, user_id, r2_key, content_type FROM library_media WHERE content_type LIKE 'image/%' AND deleted_at IS NULL AND (width IS NULL OR width = 0 OR height IS NULL OR height = 0)"
+  ).all();
+
+  const allRows = [
+    ...mediaRows.map(r => ({ ...r, table: 'media' })),
+    ...libraryRows.map(r => ({ ...r, table: 'library_media' })),
+  ];
+
+  console.log(`Found ${allRows.length} images with missing dimensions (${mediaRows.length} media, ${libraryRows.length} library)`);
+
+  if (allRows.length === 0) {
+    console.log('Nothing to do.');
+    return;
+  }
+
+  const updateMedia = db.prepare("UPDATE media SET width = ?, height = ? WHERE id = ?");
+  const updateLibrary = db.prepare("UPDATE library_media SET width = ?, height = ? WHERE id = ?");
+
+  let processed = 0;
+  let failed = 0;
+
+  for (const row of allRows) {
+    const filePath = path.join(storagePath, row.r2_key);
+
+    if (!fs.existsSync(filePath)) {
+      console.warn(`  SKIP ${row.id} — file not found: ${filePath}`);
+      failed++;
+      continue;
+    }
+
+    try {
+      const { width, height } = await getDimensions(filePath);
+
+      if (!width || !height) {
+        console.warn(`  SKIP ${row.id} — sharp returned no dimensions`);
+        failed++;
+        continue;
+      }
+
+      if (row.table === 'media') {
+        updateMedia.run(width, height, row.id);
+      } else {
+        updateLibrary.run(width, height, row.id);
+      }
+
+      processed++;
+      console.log(`  [${processed}/${allRows.length}] ${row.table} ${row.id} → ${width}x${height}`);
+    } catch (err) {
+      console.warn(`  FAIL ${row.id}: ${err.message}`);
+      failed++;
+    }
+  }
+
+  console.log(`\nDone! Processed: ${processed}, Failed: ${failed}, Total: ${allRows.length}`);
+  db.close();
+}
+
+main().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});

@@ -2,6 +2,9 @@ export interface ImageAnalysis {
   entropy: number;
   resolution: number;
   qualityScore: number;
+  width: number;
+  height: number;
+  blurDataUrl?: string;
 }
 
 export interface ImageTransformOptions {

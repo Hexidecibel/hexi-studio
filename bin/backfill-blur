@@ -1,0 +1,94 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+// Load env
+require('dotenv').config({ path: path.join(__dirname, '../apps/worker/.env.local') });
+
+const Database = require('better-sqlite3');
+
+const dbPath = process.env.DATABASE_PATH;
+const storagePath = process.env.STORAGE_PATH;
+
+if (!dbPath || !storagePath) {
+  console.error('DATABASE_PATH and STORAGE_PATH must be set in apps/worker/.env.local');
+  process.exit(1);
+}
+
+const db = new Database(dbPath);
+
+async function generateBlur(filePath) {
+  const sharp = (await import('sharp')).default;
+  const buffer = fs.readFileSync(filePath);
+  const blurBuffer = await sharp(buffer)
+    .resize(20, 20, { fit: 'inside' })
+    .blur()
+    .toFormat('webp', { quality: 20 })
+    .toBuffer();
+  return `data:image/webp;base64,${blurBuffer.toString('base64')}`;
+}
+
+async function main() {
+  const mediaRows = db.prepare(
+    "SELECT id, r2_key, content_type FROM media WHERE content_type LIKE 'image/%' AND (blur_data_url IS NULL OR blur_data_url = '') AND status = 'ready' AND deleted_at IS NULL"
+  ).all();
+
+  const libraryRows = db.prepare(
+    "SELECT id, r2_key, content_type FROM library_media WHERE content_type LIKE 'image/%' AND (blur_data_url IS NULL OR blur_data_url = '') AND deleted_at IS NULL"
+  ).all();
+
+  const allRows = [
+    ...mediaRows.map(r => ({ ...r, table: 'media' })),
+    ...libraryRows.map(r => ({ ...r, table: 'library_media' })),
+  ];
+
+  console.log(`Found ${allRows.length} images without blur_data_url (${mediaRows.length} media, ${libraryRows.length} library)`);
+
+  if (allRows.length === 0) {
+    console.log('Nothing to do.');
+    return;
+  }
+
+  const updateMedia = db.prepare("UPDATE media SET blur_data_url = ? WHERE id = ?");
+  const updateLibrary = db.prepare("UPDATE library_media SET blur_data_url = ? WHERE id = ?");
+
+  let processed = 0;
+  let failed = 0;
+
+  for (const row of allRows) {
+    const filePath = path.join(storagePath, row.r2_key);
+
+    if (!fs.existsSync(filePath)) {
+      console.warn(`  SKIP ${row.id} — file not found: ${filePath}`);
+      failed++;
+      continue;
+    }
+
+    try {
+      const blurDataUrl = await generateBlur(filePath);
+
+      if (row.table === 'media') {
+        updateMedia.run(blurDataUrl, row.id);
+      } else {
+        updateLibrary.run(blurDataUrl, row.id);
+      }
+
+      processed++;
+      if (processed % 50 === 0 || processed === allRows.length) {
+        console.log(`  Progress: ${processed}/${allRows.length} processed`);
+      }
+    } catch (err) {
+      console.warn(`  FAIL ${row.id}: ${err.message}`);
+      failed++;
+    }
+  }
+
+  console.log(`\nDone! Processed: ${processed}, Failed: ${failed}, Total: ${allRows.length}`);
+  db.close();
+}
+
+main().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});

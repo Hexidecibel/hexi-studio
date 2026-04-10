@@ -31,6 +31,7 @@ export function GallerySettingsPage() {
   const [shuffle, setShuffle] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('auto');
   const [published, setPublished] = useState(false);
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
 
   useEffect(() => {
     if (!id) return;
@@ -48,6 +49,7 @@ export function GallerySettingsPage() {
         setShuffle(config.shuffle ?? false);
         setTheme(config.theme || 'auto');
         setPublished(!!g.published);
+        setVisibility(g.visibility || 'private');
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -66,7 +68,7 @@ export function GallerySettingsPage() {
         shuffle,
         theme,
       };
-      const result = await api.galleries.update(id, { config, published });
+      const result = await api.galleries.update(id, { config, published, visibility });
       setGallery(result.data);
     } catch (err) {
       console.error('Failed to save settings:', err);
@@ -109,6 +111,53 @@ export function GallerySettingsPage() {
                 : 'Gallery is in draft mode and not publicly accessible'}
             </span>
           </label>
+        </section>
+
+        {/* Public Access */}
+        <section className="editor-section">
+          <h2>Public Access</h2>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={visibility === 'public'}
+              onChange={(e) => setVisibility(e.target.checked ? 'public' : 'private')}
+            />
+            <span>Public Gallery</span>
+            <span className="field-hint">
+              {visibility === 'public'
+                ? 'Anyone with the link can view this gallery without signing in'
+                : 'Gallery is only accessible via API key embed'}
+            </span>
+          </label>
+          {visibility === 'public' && (
+            <div className="public-url-display">
+              <label className="field">
+                <span>Public URL</span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="input"
+                    readOnly
+                    value={`${window.location.origin}/g/${gallery?.slug || ''}`}
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/g/${gallery?.slug || ''}`);
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </label>
+              {!published && (
+                <p className="field-hint" style={{ color: 'var(--color-warning)' }}>
+                  Gallery must also be published for public access to work
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Layout */}

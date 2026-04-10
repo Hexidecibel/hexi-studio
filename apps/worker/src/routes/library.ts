@@ -104,8 +104,11 @@ library.put('/:mediaId/upload', async (c) => {
     httpMetadata: { contentType: record.content_type as string },
   });
 
-  // Analyze image quality (non-fatal)
+  // Analyze image quality and extract dimensions (non-fatal)
   let metadata = '{}';
+  let width: number | null = null;
+  let height: number | null = null;
+  let blurDataUrl: string | null = null;
   const contentType = record.content_type as string;
   if (contentType.startsWith('image/')) {
     try {
@@ -117,6 +120,9 @@ library.put('/:mediaId/upload', async (c) => {
             qualityScore: analysis.qualityScore,
             entropy: analysis.entropy,
           });
+          if (analysis.width) width = analysis.width;
+          if (analysis.height) height = analysis.height;
+          if (analysis.blurDataUrl) blurDataUrl = analysis.blurDataUrl;
         }
       }
     } catch (err) {
@@ -124,10 +130,10 @@ library.put('/:mediaId/upload', async (c) => {
     }
   }
 
-  // Update status and storage
+  // Update status, dimensions, and storage
   await c.get('db').prepare(
-    "UPDATE library_media SET status = 'ready', metadata = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?"
-  ).bind(metadata, mediaId, user.id).run();
+    "UPDATE library_media SET status = 'ready', metadata = ?, width = COALESCE(?, width), height = COALESCE(?, height), blur_data_url = COALESCE(?, blur_data_url), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?"
+  ).bind(metadata, width, height, blurDataUrl, mediaId, user.id).run();
 
   await c.get('db').prepare(
     'UPDATE users SET storage_used_bytes = storage_used_bytes + ? WHERE id = ?'

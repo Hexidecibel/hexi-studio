@@ -133,8 +133,11 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
     httpMetadata: { contentType },
   });
 
-  // Analyze image quality (non-fatal)
+  // Analyze image quality and extract dimensions (non-fatal)
   let metadata = '{}';
+  let width: number | null = null;
+  let height: number | null = null;
+  let blurDataUrl: string | null = null;
   if (contentType.startsWith('image/')) {
     try {
       const transformer = c.get('imageTransformer');
@@ -145,6 +148,9 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
             qualityScore: analysis.qualityScore,
             entropy: analysis.entropy,
           });
+          if (analysis.width) width = analysis.width;
+          if (analysis.height) height = analysis.height;
+          if (analysis.blurDataUrl) blurDataUrl = analysis.blurDataUrl;
         }
       }
     } catch (err) {
@@ -166,10 +172,10 @@ mediaRoutes.put('/:mediaId/upload', async (c) => {
   const mediaType = getMediaType(contentType);
 
   await c.get('db').prepare(
-    `INSERT INTO media (id, gallery_id, user_id, filename, content_type, file_size, r2_key, media_type, sort_order, status, metadata)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?)`
+    `INSERT INTO media (id, gallery_id, user_id, filename, content_type, file_size, r2_key, media_type, sort_order, status, metadata, width, height, blur_data_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?, ?, ?, ?)`
   )
-    .bind(mediaId, galleryId, user.id, filename, contentType, fileSize, r2Key, mediaType, sortOrder, metadata)
+    .bind(mediaId, galleryId, user.id, filename, contentType, fileSize, r2Key, mediaType, sortOrder, metadata, width, height, blurDataUrl)
     .run();
 
   // Update user storage

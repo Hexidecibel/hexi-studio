@@ -93,7 +93,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<{ name: string; slug: string; config: Record<string, unknown>; published: boolean }>) =>
+    update: (id: string, data: Partial<{ name: string; slug: string; config: Record<string, unknown>; published: boolean; visibility: 'private' | 'public' }>) =>
       request<{ data: Gallery }>(`/galleries/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -256,6 +256,75 @@ export const api = {
         `/admin/users/${userId}/assume`,
         { method: 'POST' }
       ),
+    updateUser: (userId: string, data: { name?: string; plan?: string; storage_limit_bytes?: number }) =>
+      request<{ data: { id: string; email: string; name: string | null; plan: string; storage_used_bytes: number; storage_limit_bytes: number; created_at: string } }>(
+        `/admin/users/${userId}`,
+        { method: 'PATCH', body: JSON.stringify(data) }
+      ),
+    getSettings: () =>
+      request<{ data: Record<string, string> }>('/admin/settings'),
+    updateSettings: (settings: Record<string, string>) =>
+      request<{ message: string; count: number }>('/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings }),
+      }),
+  },
+
+  googlePhotos: {
+    status: () =>
+      request<{ connected: boolean; expiresAt?: string; updatedAt?: string }>('/google-photos/status'),
+    getConnectUrl: () => `${API_BASE}/google-photos/connect`,
+    disconnect: () =>
+      request<{ message: string }>('/google-photos/disconnect', { method: 'POST' }),
+    createPickerSession: () =>
+      request<{ sessionId: string; pickerUri: string; pollingConfig: { pollInterval: string; timeoutIn: string } }>(
+        '/google-photos/picker-session',
+        { method: 'POST' }
+      ),
+    pollPickerSession: (sessionId: string) =>
+      request<{
+        sessionId: string;
+        pickerUri: string;
+        mediaItemsSet: boolean;
+        mediaItems: Array<{ id: string; mimeType: string; mediaFile: { baseUrl: string; mimeType: string; filename: string } }>;
+      }>(`/google-photos/picker-session/${sessionId}`),
+    startImport: (data: {
+      sessionId: string;
+      galleryId?: string;
+      targetType?: 'gallery' | 'library';
+      mediaItems: Array<{ id: string; mimeType: string; mediaFile: { baseUrl: string; mimeType: string; filename: string } }>;
+    }) =>
+      request<{ importId: string; totalItems: number; importedItems: number; failedItems: number; status: string }>(
+        '/google-photos/import',
+        { method: 'POST', body: JSON.stringify(data) }
+      ),
+    pollImport: (importId: string) =>
+      request<{ data: { id: string; gallery_id: string | null; target_type: string; status: string; total_items: number; imported_items: number; failed_items: number; error: string | null; created_at: string; updated_at: string } }>(
+        `/google-photos/imports/${importId}`
+      ),
+    listAlbums: (pageToken?: string) =>
+      request<{
+        albums: Array<{ id: string; title: string; itemCount: number; coverUrl: string | null }>;
+        nextPageToken: string | null;
+      }>(`/google-photos/albums${pageToken ? `?pageToken=${pageToken}` : ''}`),
+    importAlbum: (data: {
+      albumId: string;
+      galleryId?: string;
+      targetType?: 'gallery' | 'library';
+    }) =>
+      request<{ importId: string; totalItems: number; importedItems: number; failedItems: number; status: string }>(
+        '/google-photos/import-album',
+        { method: 'POST', body: JSON.stringify(data) }
+      ),
+    importShared: (data: {
+      url: string;
+      galleryId?: string;
+      targetType?: 'gallery' | 'library';
+    }) =>
+      request<{ importId: string; totalItems: number; importedItems: number; failedItems: number; status: string }>(
+        '/google-photos/import-shared',
+        { method: 'POST', body: JSON.stringify(data) }
+      ),
   },
 };
 
@@ -265,6 +334,7 @@ export interface Gallery {
   slug: string;
   config: Record<string, unknown>;
   published: number;
+  visibility: 'private' | 'public';
   media_count: number;
   created_at: string;
   updated_at: string;
