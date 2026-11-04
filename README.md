@@ -1,365 +1,154 @@
-# Hexi Photo Gallery
+# hexi-studio
 
-A self-hosted photo gallery platform — image admin, gallery builder, and media CDN. Build and manage galleries for multiple client sites, serve standalone media assets via API, and give clients direct access with auto-login tokens.
+A multi-tenant photo gallery platform: a dashboard for building galleries and a media library, an image CDN with URL-based transforms, and a React component and script-tag embed for showing galleries on client sites.
 
-## Features
+The same Hono API runs on **Cloudflare Workers** (D1 + R2) or **self-hosted on Node** (SQLite + local disk or S3, with sharp for real image transforms). The storage, database and transform layers are adapters, so the route code does not know which one it is on.
 
-**Gallery Builder**
-- Create and manage photo galleries with a visual editor
-- Three layout modes: grid, masonry, and justified row
-- Drag-and-drop media upload and reorder
-- Gallery settings: columns, gap, row height, lightbox, theme
-- Publish/unpublish galleries with a toggle
+![A gallery in masonry layout, previewed from the dashboard](docs/screenshots/gallery-preview.png)
 
-**Media Library**
-- Upload standalone images not bound to any gallery
-- Tag-based organization (e.g. "artists", "heroes", "logos")
-- Public API for fetching individual images by ID
-- Use for profile photos, hero banners, or any asset on client sites
+| Gallery editor | Embed instructions |
+|---|---|
+| ![Gallery editor with upload zone and Google Photos import](docs/screenshots/editor.png) | ![Embed page with script tag and React snippets](docs/screenshots/embed.png) |
 
-**CDN & Image Transforms**
-- On-the-fly image resizing, quality adjustment, and format conversion
-- URL-based transforms: `/cdn/:userId/:mediaId/w_800,q_75,f_webp`
-- Responsive `srcSet` generation for optimal loading
-- Aggressive caching with immutable headers and ETags
+*Screenshots from a local self-hosted instance with sample images from [scikit-image](https://scikit-image.org/).*
 
-**Auth & Multi-Tenant**
-- Magic link email authentication (no passwords)
-- Auto-login tokens — generate reusable links for clients
-- Per-user storage tracking with configurable limits
-- All data scoped by user — full multi-tenant isolation
+## What it does
 
-**Embed Anywhere**
-- Script tag embed for any HTML page
-- React component via `@hexi/gallery` npm package
-- Public REST API for custom integrations
-- Cloud hook: `useHexiCloud()` for React apps
-
-**Deploy Anywhere**
-- Cloudflare Workers with D1 + R2 (zero-config scaling)
-- Self-hosted via Docker (single container, bind-mount data)
-- Self-hosted on bare metal Node.js (NAS, VPS, Raspberry Pi)
-- Pluggable storage adapters — swap between cloud and local
-- Real image transforms via sharp in self-hosted mode
+- **Galleries.** Four layouts (grid, masonry, justified, showcase), drag-and-drop upload and reorder, lightbox, theme and spacing settings, draft or published, private (API key) or public at `/g/:slug` with Open Graph tags for link previews. Images and video (MP4, WebM).
+- **Media library.** Standalone, tagged assets (logos, hero images, headshots) that client sites fetch by ID.
+- **Image CDN.** `/api/v1/cdn/:tenantId/:mediaId/:variant` with variants such as `w_800,q_75,f_webp` or the `thumb` preset, immutable cache headers and ETags. Self-hosted mode transforms with sharp; on Workers the transform adapter currently passes originals through.
+- **Import.** Google Photos via the Picker API, album import and shared-album links.
+- **Auth.** Passwordless magic links, Google and Apple OAuth (state + PKCE), an OIDC provider, reusable auto-login links for clients, and per-tenant API keys for the public endpoints (`X-API-Key`).
+- **Multi-tenant.** Every row is scoped to a user, with per-tenant storage limits and an admin view of tenants.
+- **Embed anywhere.** A script tag (`<div data-gallery="slug" data-api-key="...">` + `embed.js`) or the `@hexi/gallery` React component and its `useHexiCloud()` hook.
 
 ## Architecture
 
-Runs on **Cloudflare Workers** or **self-hosted** on any Node.js server (NAS, VPS, etc.):
-
+```mermaid
+flowchart LR
+  Dash["Dashboard<br/>React + Vite SPA"]
+  Sites["Client sites<br/>embed.js / @hexi/gallery"]
+  subgraph API["Hono API (apps/worker)"]
+    Routes["routes<br/>auth, oauth, galleries, media,<br/>library, cdn, public, api-keys,<br/>google-photos, admin"]
+    MW["middleware<br/>session, API key, rate limit"]
+  end
+  subgraph CF["Cloudflare Workers"]
+    D1[(D1)]
+    R2[(R2)]
+    PT[passthrough transform]
+  end
+  subgraph Node["Self-hosted Node"]
+    SQ[(SQLite)]
+    FS[(local disk or S3)]
+    SH[sharp transform]
+  end
+  Dash --> MW --> Routes
+  Sites --> MW
+  Routes -- "database adapter" --> D1
+  Routes -- "database adapter" --> SQ
+  Routes -- "storage adapter" --> R2
+  Routes -- "storage adapter" --> FS
+  Routes -- "image transformer" --> PT
+  Routes -- "image transformer" --> SH
 ```
-                    ┌─────────────────────────────────────────┐
-                    │            Hono API Server               │
-                    │                                         │
-                    │   ┌─────────────────────────────────┐   │
-                    │   │      Storage Adapters            │   │
-┌─────────────┐    │   │                                  │   │
-│  Dashboard   │───▶│   │  Cloudflare    │    Local/NAS    │   │
-│  (React SPA) │    │   │  R2 + D1       │    FS + SQLite  │   │
-└─────────────┘    │   │  (passthrough)  │    (sharp)      │   │
-                    │   └─────────────────────────────────┘   │
-┌─────────────┐    │                                         │
-│ Client Sites │───▶│                                         │
-│ (embed/API)  │    └─────────────────────────────────────────┘
-└─────────────┘
-```
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 20+ (22 LTS recommended)
-- npm
-- For Cloudflare mode: Cloudflare account with D1 + R2
-- For local/self-hosted mode: any Linux/macOS server with filesystem storage
-
-### Development
-
-```bash
-# Clone and install
-git clone https://github.com/your-org/hexi-photo-gallery.git
-cd hexi-photo-gallery
-npm install
-
-# Start all dev servers
-npm run dev
-
-# Or start individually
-cd apps/worker && npm run dev    # API on :8787
-cd apps/dashboard && npm run dev # Dashboard on :5173
-```
-
-### Self-Hosted / Local Mode
-
-Run the API on your own server with local filesystem storage and SQLite — no Cloudflare account needed.
-
-```bash
-cd apps/worker
-
-# Configure environment
-cp .env.local.example .env.local
-# Edit .env.local: set STORAGE_PATH, DATABASE_PATH, SMTP credentials
-
-# Create storage directory
-mkdir -p /path/to/media/files
-
-# Run database migrations
-cat migrations/0001_initial.sql migrations/0002_auto_login_and_library.sql | sqlite3 /path/to/media/hexi.db
-
-# Start the server
-npm run dev:local     # Development (with hot reload)
-npm run build:local   # Production build
-npm run start:local   # Production start
-```
-
-Local mode includes **real image transforms** via sharp (resize, WebP/AVIF conversion, quality adjustment) — the Cloudflare mode currently serves originals.
-
-### Build
-
-```bash
-npm run build    # Build all packages
-npm run test     # Run tests
-npm run lint     # Lint all packages
-```
-
-## Project Structure
 
 ```
 apps/
-├── worker/          # API server (Hono) — runs on Cloudflare Workers or Node.js
-├── dashboard/       # Dashboard SPA (React, Vite)
-└── embed/           # Embed script for HTML pages
+  worker/       Hono API: src/index.ts (Workers entry), src/server.ts (Node entry), migrations/
+  dashboard/    React SPA
 packages/
-├── gallery/         # @hexi/gallery React component
-└── shared/          # Shared types and utilities
+  gallery/      @hexi/gallery: the React gallery component and useHexiCloud hook (the tested package)
+  embed/        embed.js script-tag loader
+  shared/       shared types
 ```
 
-## API Overview
+The schema is 13 tables across 9 SQL migrations in `apps/worker/migrations/`: users, sessions, magic-link and auto-login tokens, galleries, media, library media, API keys, OAuth accounts and states, app settings, and Google Photos tokens and imports.
 
-### Galleries
+## Engineering decisions
+
+- **One codebase, two runtimes.** The Workers build is the low-ops path; the Node build exists because real image transforms and plain files on a NAS were worth more than zero-ops for some deployments. The adapter boundary (`DatabaseAdapter`, `StorageAdapter`, `ImageTransformer`) keeps the routes identical; D1's prepared-statement API is the shape the SQLite adapter implements.
+- **Two-step uploads.** The client asks for an upload URL, PUTs the bytes, then confirms with dimensions. Quota, type and size checks happen before any bytes move.
+- **Tokens are stored hashed.** Magic links, auto-login links and API keys are kept as SHA-256 hashes; magic links expire after 15 minutes and are single-use.
+- **Transforms in the URL.** Variants are part of the path, so every size is a separate, immutable, cacheable object.
+
+## Quick start (self-hosted, local)
+
+Requires Node 20+ and the `sqlite3` CLI.
 
 ```bash
-# Create a gallery
-POST /api/v1/galleries
-{ "name": "Portfolio" }
+git clone https://github.com/Hexidecibel/hexi-studio
+cd hexi-studio
+npm install
 
-# Upload media to a gallery
-POST /api/v1/galleries/:id/media/upload-url
-PUT  /api/v1/galleries/:id/media/:mediaId/upload
-POST /api/v1/galleries/:id/media/confirm
+# Database and storage
+mkdir -p data/files
+cat apps/worker/migrations/*.sql | sqlite3 data/hexi.db
+
+# API on :4100
+cd apps/worker
+RUNTIME_MODE=local STORAGE_PATH=../../data/files DATABASE_PATH=../../data/hexi.db \
+  PORT=4100 CORS_ORIGIN='*' MAGIC_LINK_BASE_URL=http://localhost:4101 \
+  npm run dev:local
+
+# Dashboard on :4101 (proxies /api to :4100), in a second terminal
+cd apps/dashboard && npm run dev
 ```
 
-### Media Library
+Open `http://localhost:4101` and sign in with any email. Without SMTP settings the API prints the magic link to its console. `apps/worker/.env.local.example` lists every variable, including SMTP and the OAuth providers; copy it to `.env.local` instead of passing them inline.
+
+### Docker
+
+The `Dockerfile` builds the dashboard and the Node API into one image that serves the SPA at `/` and the API at `/api/v1/*` on port 4100:
 
 ```bash
-# Upload a standalone image
-POST /api/v1/library/upload
-PUT  /api/v1/library/:mediaId/upload
-POST /api/v1/library/confirm
-
-# Fetch a public image by ID (for use on client sites)
-GET /api/v1/public/media/:id
-# Returns: { id, src, alt, width, height, thumbnail, srcSet }
+docker build -t hexi-studio .
+mkdir -p data/files && cat apps/worker/migrations/*.sql | sqlite3 data/hexi.db
+docker run -p 4100:4100 -v "$PWD/data:/data" \
+  -e RUNTIME_MODE=local -e DATABASE_PATH=/data/hexi.db -e STORAGE_PATH=/data/files \
+  hexi-studio
 ```
 
-### CDN Transforms
+### Cloudflare Workers
 
-```bash
-# Original
-GET /api/v1/cdn/:userId/:mediaId/original
+Set your D1 database and R2 bucket in `apps/worker/wrangler.toml`, apply each file in `migrations/` with `wrangler d1 execute <db> --remote --file=...`, then `npm run deploy` in `apps/worker`. Build the dashboard with `npm run build` in `apps/dashboard` and host `dist/` on any static host.
 
-# Resized with quality and format
-GET /api/v1/cdn/:userId/:mediaId/w_800,q_75,f_webp
+## Using it from a client site
 
-# Thumbnail preset
-GET /api/v1/cdn/:userId/:mediaId/thumb
+```html
+<div data-gallery="launch-day" data-api-key="YOUR_API_KEY"></div>
+<script src="https://<your-host>/embed.js" async></script>
 ```
-
-> In local/self-hosted mode, transforms are processed by [sharp](https://sharp.pixelplumbing.com/) and support real resizing, format conversion (WebP, AVIF), and quality adjustment.
-
-### Auto-Login Tokens
-
-```bash
-# Generate a reusable login link for a client
-POST /api/v1/auth/auto-login-tokens
-{ "label": "Client Name" }
-# Returns a token — build a URL: /auth/auto?token=xxx
-
-# Client clicks the link → instant dashboard access
-GET /api/v1/auth/auto?token=xxx
-```
-
-## Using the Gallery Component
-
-### NPM Package
-
-```bash
-npm install @hexi/gallery
-```
-
-```tsx
-import { Gallery } from '@hexi/gallery';
-import '@hexi/gallery/styles';
-
-function MyGallery() {
-  return (
-    <Gallery
-      images={images}
-      layout={{ type: 'masonry', columns: 3, gap: 8 }}
-      enableLightbox
-    />
-  );
-}
-```
-
-### With Cloud Data
 
 ```tsx
 import { Gallery, useHexiCloud } from '@hexi/gallery';
 import '@hexi/gallery/styles';
 
-function MyGallery() {
-  const { items, loading, config } = useHexiCloud('my-gallery-slug');
-  if (loading) return <div>Loading...</div>;
+function LaunchDay() {
+  const { items, loading, config } = useHexiCloud('launch-day');
+  if (loading) return null;
   return <Gallery images={items} layout={config.layout} enableLightbox />;
 }
 ```
 
-### Script Tag Embed
+`@hexi/gallery` is a workspace package with a release workflow (`.github/workflows/publish.yml`); it is not on the npm registry yet, so install it from the repo for now.
 
-```html
-<div id="hexi-gallery" data-gallery="my-gallery-slug"></div>
-<script src="https://your-cdn/embed.js" async></script>
-```
-
-## Using the Media Library on Client Sites
-
-Fetch a single image by ID for use anywhere — profile photos, hero banners, etc:
-
-```tsx
-// Fetch image metadata
-const img = await fetch('/api/v1/public/media/abc123').then(r => r.json());
-
-// Use it
-<img
-  src={img.src}
-  alt={img.alt}
-  width={img.width}
-  height={img.height}
-  srcSet={img.srcSet}
-/>
-```
-
-## Deployment
-
-### Cloudflare Workers
+A single library image:
 
 ```bash
-cd apps/worker
-
-# Configure wrangler.toml with your D1 database and R2 bucket
-# Set environment variables: CORS_ORIGIN, CDN_BASE_URL, SMTP_* or RESEND_API_KEY
-
-# Run migrations
-wrangler d1 execute hexi-gallery --file=migrations/0001_initial.sql
-wrangler d1 execute hexi-gallery --file=migrations/0002_auto_login_and_library.sql
-
-# Deploy
-wrangler deploy
+curl -H "X-API-Key: $KEY" https://<your-host>/api/v1/public/media/<id>
+# { id, src, alt, width, height, thumbnail, srcSet }
 ```
 
-### Dashboard
+## Tests and CI
 
 ```bash
-cd apps/dashboard
+npm run test:run   # Vitest via turbo: 146 tests in 20 files (packages/gallery)
+npm run lint
 npm run build
-# Deploy dist/ to your static hosting (Cloudflare Pages, Vercel, Nginx, etc.)
 ```
 
-### Docker (Recommended for Self-Hosting)
-
-Single container — builds the API and dashboard together, serves everything from one image.
-
-```bash
-# Clone the repo
-git clone https://github.com/your-org/hexi-photo-gallery.git
-cd hexi-photo-gallery
-
-# Create data directory
-mkdir -p /path/to/media/files
-
-# Run database migrations
-cat apps/worker/migrations/*.sql | sqlite3 /path/to/media/hexi.db
-
-# Build and start
-docker compose build
-docker compose up -d
-```
-
-The container:
-- Builds the dashboard SPA and API into a single Node.js image
-- Serves the dashboard at `/` and API at `/api/v1/*`
-- Uses SQLite + local filesystem + sharp for image transforms
-- Expects data at `/data` (bind-mount your storage directory)
-
-Environment variables:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `RUNTIME_MODE` | Must be `local` | `local` |
-| `DATABASE_PATH` | SQLite DB path inside container | `/data/hexi.db` |
-| `STORAGE_PATH` | Media files path inside container | `/data/files` |
-| `CORS_ORIGIN` | Your dashboard URL | `https://gallery.example.com` |
-| `MAGIC_LINK_BASE_URL` | Base URL for magic link emails | `https://gallery.example.com` |
-| `SMTP_HOST` | SMTP server | `smtp.example.com` |
-| `SMTP_PORT` | SMTP port | `587` |
-| `SMTP_USER` | SMTP username | `user@example.com` |
-| `SMTP_PASS` | SMTP password | `secret` |
-| `SMTP_FROM` | From address for emails | `Gallery <noreply@example.com>` |
-| `ADMIN_EMAIL` | Admin user email (auto-created) | `admin@example.com` |
-
-### Bare Metal (without Docker)
-
-```bash
-cd apps/worker
-
-# Configure
-cp .env.local.example .env.local
-# Edit .env.local with your paths and SMTP credentials
-
-# Initialize database
-mkdir -p /your/storage/path/files
-cat migrations/*.sql | sqlite3 /your/storage/path/hexi.db
-
-# Build and run
-npm run build:local
-npm run start:local    # Or use PM2: pm2 start dist/server.js --name hexi-api
-```
-
-Environment variables for local mode:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `RUNTIME_MODE` | Set to `local` for filesystem + SQLite | `local` |
-| `STORAGE_PATH` | Directory for media files | `/mnt/nas/hexi/files` |
-| `DATABASE_PATH` | Path to SQLite database file | `/mnt/nas/hexi/hexi.db` |
-| `PORT` | API server port | `8787` |
-| `CORS_ORIGIN` | Allowed origins | `*` |
-| `SMTP_HOST` | SMTP server for magic link emails | `smtp.example.com` |
-
-## Database
-
-SQLite via Cloudflare D1. Tables:
-
-| Table | Purpose |
-|-------|---------|
-| `users` | Tenant accounts with storage limits |
-| `sessions` | Auth sessions (30-day expiry) |
-| `magic_link_tokens` | Email verification tokens |
-| `auto_login_tokens` | Reusable login tokens |
-| `galleries` | Gallery collections with JSON config |
-| `media` | Gallery-bound images and videos |
-| `library_media` | Standalone media assets with tags |
+The [CI workflow](.github/workflows/ci.yml) runs lint, tests and build on every push. The API has no automated tests yet; it is the next gap to close.
 
 ## License
 
-MIT
+[MIT](LICENSE)
